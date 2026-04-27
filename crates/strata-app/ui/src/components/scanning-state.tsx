@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import type { BigFile, ProgressEvent, TopDir } from "../types";
 import { moveToTrash, revealInFinder } from "../ipc";
 import SnapshotTreemap from "./snapshot-treemap";
@@ -33,9 +33,11 @@ interface Props {
   onCancel: () => void;
 }
 
-// Single content column. Every section locks to this width so the eye has
-// one rail to follow.
-const COL_WIDTH = 760;
+// Wide layout: header + counters span the full content width; below them a
+// 2-col grid splits the treemap (left, more space) and the biggest-files list
+// (right, tall + scrollable) so the user can drill while watching the map.
+const MAX_WIDTH = 1400;
+const TREEMAP_HEIGHT = 520;
 
 export default function ScanningState(props: Props) {
   const currentPhase = () => props.phases.find((p) => p.status === "active");
@@ -44,6 +46,26 @@ export default function ScanningState(props: Props) {
   // Optimistic: removed immediately from the view. Hidden in subsequent
   // snapshots too (path-prefix match).
   const [deleted, setDeleted] = createSignal<string[]>([]);
+
+  // The treemap renderer needs an explicit pixel width. Measure the
+  // container with ResizeObserver so the map stays responsive when the
+  // window is resized (or sidebar toggled).
+  const [treemapWidth, setTreemapWidth] = createSignal(800);
+  let treemapHostRef: HTMLDivElement | undefined;
+  let ro: ResizeObserver | undefined;
+  onMount(() => {
+    if (!treemapHostRef) return;
+    ro = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        const w = Math.floor(e.contentRect.width);
+        if (w > 0) setTreemapWidth(w);
+      }
+    });
+    ro.observe(treemapHostRef);
+  });
+  onCleanup(() => {
+    ro?.disconnect();
+  });
 
   const isDeleted = (path: string): boolean => {
     const list = deleted();
@@ -100,58 +122,77 @@ export default function ScanningState(props: Props) {
           <Counter label="Elapsed" value={formatElapsed(props.elapsedMs)} />
         </div>
 
-        {/* Top folders — 2D treemap */}
-        <Show when={visibleTopDirs().length > 0}>
-          <Section title="Top folders so far">
-            <SnapshotTreemap
-              topDirs={visibleTopDirs()}
-              width={COL_WIDTH}
-              height={280}
-              onTrash={handleTrash}
-            />
-          </Section>
-        </Show>
+        {/* 2-col grid: treemap left, biggest-files right. Both panels are
+            tall and aligned at the top so the user can compare a folder
+            tile to the heavy files inside it at a glance. */}
+        <div style={twoCol}>
+          {/* Left: treemap */}
+          <div style={leftCol}>
+            <div style={sectionTitle}>Top folders so far</div>
+            <div ref={treemapHostRef} style={{ width: "100%" }}>
+              <Show
+                when={visibleTopDirs().length > 0}
+                fallback={
+                  <div style={treemapPlaceholder}>Collecting…</div>
+                }
+              >
+                <SnapshotTreemap
+                  topDirs={visibleTopDirs()}
+                  width={treemapWidth()}
+                  height={TREEMAP_HEIGHT}
+                  onTrash={handleTrash}
+                />
+              </Show>
+            </div>
+          </div>
 
-        {/* Biggest files */}
-        <Show when={visibleFiles().length > 0}>
-          <Section title={`Biggest files found (${visibleFiles().length})`}>
-            <ol style={fileList}>
-              <For each={visibleFiles()}>
-                {(f) => (
-                  <li
-                    style={fileRow}
-                    title={`${f.path}\n\nRight-click to reveal in Finder`}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      void revealInFinder(f.path);
-                    }}
-                  >
-                    <span style={fileName}>{f.name}</span>
-                    <span style={fileSize}>{formatBytes(f.size_bytes)}</span>
-                    <div style={rowActions}>
-                      <button
-                        style={iconBtn}
-                        onClick={(e) => { e.stopPropagation(); void revealInFinder(f.path); }}
-                        title="Reveal in Finder"
-                        aria-label="Reveal in Finder"
-                      >
-                        {folderIconSvg()}
-                      </button>
-                      <button
-                        style={iconBtnDanger}
-                        onClick={(e) => { e.stopPropagation(); void handleTrash(f.path); }}
-                        title="Move to Trash"
-                        aria-label="Move to Trash"
-                      >
-                        {trashIconSvg()}
-                      </button>
-                    </div>
-                  </li>
-                )}
-              </For>
-            </ol>
-          </Section>
-        </Show>
+          {/* Right: biggest-files list */}
+          <div style={rightCol}>
+            <div style={sectionTitle}>
+              Biggest files found ({visibleFiles().length})
+            </div>
+            <Show
+              when={visibleFiles().length > 0}
+              fallback={<div style={listPlaceholder}>Collecting…</div>}
+            >
+              <ol style={fileList}>
+                <For each={visibleFiles()}>
+                  {(f) => (
+                    <li
+                      style={fileRow}
+                      title={`${f.path}\n\nRight-click to reveal in Finder`}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        void revealInFinder(f.path);
+                      }}
+                    >
+                      <span style={fileName}>{f.name}</span>
+                      <span style={fileSize}>{formatBytes(f.size_bytes)}</span>
+                      <div style={rowActions}>
+                        <button
+                          style={iconBtn}
+                          onClick={(e) => { e.stopPropagation(); void revealInFinder(f.path); }}
+                          title="Reveal in Finder"
+                          aria-label="Reveal in Finder"
+                        >
+                          {folderIconSvg()}
+                        </button>
+                        <button
+                          style={iconBtnDanger}
+                          onClick={(e) => { e.stopPropagation(); void handleTrash(f.path); }}
+                          title="Move to Trash"
+                          aria-label="Move to Trash"
+                        >
+                          {trashIconSvg()}
+                        </button>
+                      </div>
+                    </li>
+                  )}
+                </For>
+              </ol>
+            </Show>
+          </div>
+        </div>
 
         {/* Phase timeline */}
         <Show when={props.phases.length > 0}>
@@ -184,15 +225,6 @@ function Counter(p: { label: string; value: string }) {
 
 function Divider() {
   return <div style={counterDivider} />;
-}
-
-function Section(p: { title: string; children: any }) {
-  return (
-    <div style={section}>
-      <div style={sectionTitle}>{p.title}</div>
-      {p.children}
-    </div>
-  );
 }
 
 function folderIconSvg() {
@@ -252,14 +284,55 @@ const wrap = {
   "overflow-y": "auto",
 } as const;
 
-// Single content column. Every section locks to COL_WIDTH so the eye has one
-// vertical rail.
+// Wide content area. Header + counters span this full width; below them a
+// 2-col grid carves space for the treemap (left) and biggest-files (right).
 const column = {
-  width: `${COL_WIDTH}px`,
-  "max-width": "100%",
+  width: "100%",
+  "max-width": `${MAX_WIDTH}px`,
   display: "flex",
   "flex-direction": "column",
   gap: "20px",
+} as const;
+
+const twoCol = {
+  display: "grid",
+  // Treemap gets ~62% of width; biggest-files gets ~38%. Min 320px on the
+  // right so the list never collapses to nothing on narrow windows.
+  "grid-template-columns": "minmax(0, 1.6fr) minmax(320px, 1fr)",
+  gap: "20px",
+  "align-items": "start",
+} as const;
+
+const leftCol = {
+  display: "flex",
+  "flex-direction": "column",
+  gap: "8px",
+  "min-width": "0",
+} as const;
+
+const rightCol = {
+  display: "flex",
+  "flex-direction": "column",
+  gap: "8px",
+  "min-width": "0",
+} as const;
+
+const treemapPlaceholder = {
+  width: "100%",
+  height: `${TREEMAP_HEIGHT}px`,
+  display: "flex",
+  "align-items": "center",
+  "justify-content": "center",
+  "border-radius": "10px",
+  border: "1px solid #1a1a22",
+  background: "#0d0d12",
+  color: "#6b7280",
+  "font-size": "12px",
+  "font-family": "SF Mono, monospace",
+} as const;
+
+const listPlaceholder = {
+  ...treemapPlaceholder,
 } as const;
 
 const headerCard = {
@@ -352,13 +425,6 @@ const counterLabel = {
   "margin-top": "6px",
 } as const;
 
-const section = {
-  width: "100%",
-  display: "flex",
-  "flex-direction": "column",
-  gap: "8px",
-} as const;
-
 const sectionTitle = {
   "font-size": "10px",
   "text-transform": "uppercase",
@@ -377,9 +443,9 @@ const fileList = {
   display: "flex",
   "flex-direction": "column",
   gap: "2px",
-  // Cap at ~10 rows tall and let the user scroll further; the backend now
-  // tracks up to 200 biggest files, so there is real content below the fold.
-  "max-height": "360px",
+  // Match the treemap panel height so the two columns visually align.
+  // Backend tracks 200 biggest files; the user scrolls within this box.
+  height: `${TREEMAP_HEIGHT}px`,
   "overflow-y": "auto",
   "overscroll-behavior": "contain",
 } as const;

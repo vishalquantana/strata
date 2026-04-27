@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-04-27
+
+### Changed
+- **Wide 2-column scanning layout.** The scanning view used to be a single
+  760 px column with huge empty bands on either side. It now spreads to a
+  responsive max 1400 px wide grid: header card + counters span the full
+  width, and below them a 2-col layout puts the treemap on the left (≈62 %
+  width, 520 px tall) with the biggest-files list on the right (≈38 %
+  width, same height, scrollable). Treemap width adapts via `ResizeObserver`
+  so resizing the window or toggling the sidebar reflows cleanly.
+
 ## [0.3.5] - 2026-04-27
 
 ### Changed
@@ -179,7 +190,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drill-down / zoom-out via click and breadcrumb
 - Volume listing via `sysinfo`
 
-[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.5...HEAD
+[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.6...HEAD
+[0.3.6]: https://github.com/vishalquantana/strata/releases/tag/v0.3.6
 [0.3.5]: https://github.com/vishalquantana/strata/releases/tag/v0.3.5
 [0.3.4]: https://github.com/vishalquantana/strata/releases/tag/v0.3.4
 [0.3.3]: https://github.com/vishalquantana/strata/releases/tag/v0.3.3
