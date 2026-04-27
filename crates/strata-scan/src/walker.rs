@@ -48,6 +48,7 @@ pub fn walk(root: &Path) -> Result<ScanTree> {
             // filesystem device (e.g. APFS sub-volumes under /System/Volumes,
             // or network mounts). Setting read_children_path = None stops
             // jwalk from enumerating those subtrees entirely.
+            // TODO: no automated test for cross-device boundary; requires a real mount (APFS/tmpfs)
             children.iter_mut().for_each(|child_result| {
                 if let Ok(child) = child_result {
                     if child.file_type().is_dir() {
@@ -165,8 +166,12 @@ pub fn walk(root: &Path) -> Result<ScanTree> {
                         let on_same_device = child
                             .metadata()
                             .map(|m| m.dev() == root_dev)
-                            .unwrap_or(true);
+                            .unwrap_or(true); // on error, assume same and let natural errors surface
                         if !on_same_device {
+                            eprintln!(
+                                "[strata-scan] skipping cross-device mount: {}",
+                                child.path().display()
+                            );
                             child.read_children_path = None;
                         }
                     }

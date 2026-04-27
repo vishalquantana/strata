@@ -18,7 +18,7 @@ use crate::model::ScanTree;
 use crate::progress::ProgressEvent;
 use crate::spotlight::SpotlightProbe;
 use crate::timemachine::TmChecker;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use jwalk::WalkDir;
 use std::collections::HashMap;
 use std::os::unix::fs::MetadataExt;
@@ -130,7 +130,9 @@ pub fn run(
         // Walk the root once more to enumerate large files.
         // Use the same device-boundary guard as the walker to avoid crossing
         // into APFS sub-volumes or network mounts.
-        let root_dev: u64 = std::fs::metadata(root).map(|m| m.dev()).unwrap_or(0);
+        let root_dev: u64 = std::fs::metadata(root)
+            .with_context(|| format!("failed to stat {} for hash pass", root.display()))?
+            .dev();
         let mut large_files = Vec::new();
         for entry in WalkDir::new(root)
             .skip_hidden(false)
@@ -141,8 +143,12 @@ pub fn run(
                             let on_same_device = child
                                 .metadata()
                                 .map(|m| m.dev() == root_dev)
-                                .unwrap_or(true);
+                                .unwrap_or(true); // on error, assume same and let natural errors surface
                             if !on_same_device {
+                                eprintln!(
+                                    "[strata-scan] skipping cross-device mount: {}",
+                                    child.path().display()
+                                );
                                 child.read_children_path = None;
                             }
                         }
