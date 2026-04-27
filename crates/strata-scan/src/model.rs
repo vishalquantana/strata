@@ -15,10 +15,10 @@ pub type NodeId = u32;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Stale {
-    Hot,        // ≤ 30 days since last touched
-    Warm,       // 31-180 days
-    Stale,      // 180 days - 2 years
-    VeryStale,  // > 2 years
+    Hot,       // ≤ 30 days since last touched
+    Warm,      // 31-180 days
+    Stale,     // 180 days - 2 years
+    VeryStale, // > 2 years
 }
 
 /// All six signals collected for a directory.

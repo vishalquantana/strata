@@ -1,7 +1,7 @@
 use std::fs;
 use std::io::Write;
-use tempfile::tempdir;
 use strata_scan::walker::walk;
+use tempfile::tempdir;
 
 /// Build a small fixture tree:
 /// root/
@@ -86,6 +86,8 @@ fn flags_junk_directories() {
 
 #[test]
 fn returns_empty_tree_for_nonexistent_path() {
-    let result = walk(std::path::Path::new("/tmp/definitely-does-not-exist-xyz123"));
+    let result = walk(std::path::Path::new(
+        "/tmp/definitely-does-not-exist-xyz123",
+    ));
     assert!(result.is_err());
 }

@@ -1,6 +1,6 @@
 use std::fs;
-use tempfile::tempdir;
 use strata_scan::{run, ScanOptions};
+use tempfile::tempdir;
 
 #[test]
 fn small_fixture_tree() {
@@ -25,7 +25,11 @@ fn small_fixture_tree() {
     assert_eq!(root.file_count, 3);
     assert_eq!(root.children.len(), 2);
 
-    let nm = tree.nodes.iter().find(|n| n.name == "node_modules").unwrap();
+    let nm = tree
+        .nodes
+        .iter()
+        .find(|n| n.name == "node_modules")
+        .unwrap();
     assert!(nm.signals.is_known_junk);
     assert_eq!(nm.size_bytes, 2);
 

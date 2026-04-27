@@ -1,6 +1,6 @@
 use std::fs;
-use tempfile::tempdir;
 use strata_scan::hasher::find_duplicates;
+use tempfile::tempdir;
 
 #[test]
 fn identical_large_files_are_grouped() {

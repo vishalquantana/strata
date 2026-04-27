@@ -1,6 +1,6 @@
 use chrono::Utc;
 use strata_scan::model::{DirNode, ScanTree, Signals};
-use strata_scan::output::{render_tree_json, render_progress_jsonl};
+use strata_scan::output::{render_progress_jsonl, render_tree_json};
 use strata_scan::progress::ProgressEvent;
 
 #[test]
@@ -10,9 +10,15 @@ fn renders_tree_as_json() {
         scanned_at: Utc::now(),
         source_path: "/x".into(),
         nodes: vec![DirNode {
-            id: 0, parent_id: None, path: "/x".into(), name: "x".into(),
-            depth: 0, size_bytes: 100, file_count: 1,
-            signals: Signals::default(), children: vec![],
+            id: 0,
+            parent_id: None,
+            path: "/x".into(),
+            name: "x".into(),
+            depth: 0,
+            size_bytes: 100,
+            file_count: 1,
+            signals: Signals::default(),
+            children: vec![],
         }],
     };
     let s = render_tree_json(&tree).unwrap();

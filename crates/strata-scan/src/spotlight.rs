@@ -18,23 +18,22 @@ pub struct SpotlightProbe {
 
 impl SpotlightProbe {
     pub fn real() -> Self {
-        Self { backend: Backend::Real }
+        Self {
+            backend: Backend::Real,
+        }
     }
 
     pub fn stub(answers: Vec<Option<DateTime<Utc>>>) -> Self {
-        Self { backend: Backend::Stub(answers) }
+        Self {
+            backend: Backend::Stub(answers),
+        }
     }
 
     /// For each input path, returns the file's `kMDItemLastUsedDate`, or `None`
     /// if Spotlight has no record. Output Vec is the same length as input.
     pub fn last_used_for_paths(&self, paths: &[String]) -> Vec<Option<DateTime<Utc>>> {
         match &self.backend {
-            Backend::Stub(answers) => answers
-                .iter()
-                .cycle()
-                .take(paths.len())
-                .cloned()
-                .collect(),
+            Backend::Stub(answers) => answers.iter().cycle().take(paths.len()).cloned().collect(),
             Backend::Real => paths.iter().map(|p| query_mdls(p)).collect(),
         }
     }

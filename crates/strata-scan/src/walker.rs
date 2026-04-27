@@ -50,9 +50,9 @@ pub fn walk(root: &Path) -> Result<ScanTree> {
         let parent_path = path.parent().map(|p| p.to_string_lossy().to_string());
         let parent_id = parent_path.and_then(|p| path_to_id.get(&p).copied());
 
-        let depth = if parent_id.is_some() {
+        let depth = if let Some(pid) = parent_id {
             // Look up parent's depth + 1
-            let parent = &nodes[parent_id.unwrap() as usize];
+            let parent = &nodes[pid as usize];
             parent.depth + 1
         } else {
             0
@@ -65,11 +65,11 @@ pub fn walk(root: &Path) -> Result<ScanTree> {
                 (
                     m.created()
                         .ok()
-                        .map(|t| DateTime::<Utc>::from(t))
+                        .map(DateTime::<Utc>::from)
                         .unwrap_or_else(epoch),
                     m.modified()
                         .ok()
-                        .map(|t| DateTime::<Utc>::from(t))
+                        .map(DateTime::<Utc>::from)
                         .unwrap_or_else(epoch),
                 )
             })

@@ -9,7 +9,7 @@ fn matches_node_modules_basename() {
 
 #[test]
 fn matches_build_artifact_dirs() {
-    assert!(is_known_junk(Path::new("/x/y/target")));        // Rust
+    assert!(is_known_junk(Path::new("/x/y/target"))); // Rust
     assert!(is_known_junk(Path::new("/x/y/dist")));
     assert!(is_known_junk(Path::new("/x/y/build")));
     assert!(is_known_junk(Path::new("/x/y/.next")));

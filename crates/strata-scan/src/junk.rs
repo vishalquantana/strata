@@ -15,7 +15,7 @@ const JUNK_BASENAMES: &[&str] = &[
     ".next",
     "dist",
     "build",
-    "target",       // Rust
+    "target", // Rust
     "__pycache__",
     ".venv",
     "venv",
@@ -47,8 +47,7 @@ pub fn is_known_junk(path: &Path) -> bool {
     for suffix in JUNK_PATH_SUFFIXES {
         // Match either exactly ".../Library/Caches" or anything beneath it.
         if path_str.contains(&format!("/{suffix}"))
-            && (path_str.ends_with(suffix)
-                || path_str.contains(&format!("/{suffix}/")))
+            && (path_str.ends_with(suffix) || path_str.contains(&format!("/{suffix}/")))
         {
             return true;
         }

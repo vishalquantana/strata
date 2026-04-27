@@ -1,4 +1,4 @@
-use strata_scan::timemachine::{TmStatus, TmChecker};
+use strata_scan::timemachine::{TmChecker, TmStatus};
 
 /// We can't reliably exercise real `tmutil` in unit tests because the answer
 /// depends on the user's TM config. We test the public API surface that

@@ -36,10 +36,7 @@ pub fn is_in_icloud_path(home: &str, path: &str) -> bool {
 /// Best-effort — returns false on any error.
 #[cfg(target_os = "macos")]
 pub fn has_cloud_docs_xattr(path: &Path) -> bool {
-    matches!(
-        xattr::get(path, "com.apple.cloud.docs"),
-        Ok(Some(_))
-    )
+    matches!(xattr::get(path, "com.apple.cloud.docs"), Ok(Some(_)))
 }
 
 #[cfg(not(target_os = "macos"))]

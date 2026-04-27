@@ -82,7 +82,9 @@ pub fn run(
     // --- iCloud probe ---
     let mut icloud_status: HashMap<String, bool> = HashMap::new();
     if !options.disable_icloud && icloud_drive_enabled(&home) {
-        progress_cb(&ProgressEvent::ProbeStarted { kind: "icloud".into() });
+        progress_cb(&ProgressEvent::ProbeStarted {
+            kind: "icloud".into(),
+        });
         for n in &tree.nodes {
             let by_path = is_in_icloud_path(&home, &n.path);
             let by_xattr = has_cloud_docs_xattr(Path::new(&n.path));
@@ -99,7 +101,9 @@ pub fn run(
     // --- Spotlight probe ---
     let mut last_used: HashMap<String, chrono::DateTime<chrono::Utc>> = HashMap::new();
     if !options.disable_spotlight {
-        progress_cb(&ProgressEvent::ProbeStarted { kind: "spotlight".into() });
+        progress_cb(&ProgressEvent::ProbeStarted {
+            kind: "spotlight".into(),
+        });
         let probe = SpotlightProbe::real();
         // Sample by directory: query each dir's last-used-date directly. This is
         // an approximation — real per-file rollup is deferred to a later version.
@@ -119,7 +123,9 @@ pub fn run(
     // --- Hashing probe ---
     let mut dupe_groups: HashMap<String, u64> = HashMap::new();
     if !options.disable_hash {
-        progress_cb(&ProgressEvent::ProbeStarted { kind: "hash".into() });
+        progress_cb(&ProgressEvent::ProbeStarted {
+            kind: "hash".into(),
+        });
         // Walk the root once more to enumerate large files.
         let mut large_files = Vec::new();
         for entry in WalkDir::new(root).skip_hidden(false).into_iter().flatten() {

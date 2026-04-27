@@ -8,11 +8,26 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum ProgressEvent {
-    WalkStarted { root: String },
-    WalkProgress { dirs_seen: u64, files_seen: u64, bytes_seen: u64 },
-    WalkCompleted { node_count: usize },
-    ProbeStarted { kind: String },
-    ProbeCompleted { kind: String, applied: usize },
+    WalkStarted {
+        root: String,
+    },
+    WalkProgress {
+        dirs_seen: u64,
+        files_seen: u64,
+        bytes_seen: u64,
+    },
+    WalkCompleted {
+        node_count: usize,
+    },
+    ProbeStarted {
+        kind: String,
+    },
+    ProbeCompleted {
+        kind: String,
+        applied: usize,
+    },
     ScanFinished,
-    Error { message: String },
+    Error {
+        message: String,
+    },
 }
