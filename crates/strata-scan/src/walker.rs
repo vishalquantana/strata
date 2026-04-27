@@ -13,6 +13,7 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use jwalk::WalkDir;
 use std::collections::HashMap;
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 /// Walk the given root and return the populated scan tree.
@@ -21,6 +22,14 @@ pub fn walk(root: &Path) -> Result<ScanTree> {
     let canonical = root
         .canonicalize()
         .with_context(|| format!("failed to canonicalize {}", root.display()))?;
+
+    // Get the device ID of the root so we can skip cross-device mount points.
+    // On macOS with APFS, scanning `/` would otherwise descend into every
+    // sub-volume under `/System/Volumes/` and loop forever via
+    // `/Volumes/Macintosh HD -> /`.
+    let root_dev: u64 = std::fs::metadata(&canonical)
+        .with_context(|| format!("failed to stat {}", canonical.display()))?
+        .dev();
 
     // First pass: enumerate every directory, build flat node list, capture
     // each dir's own metadata. Use parallel walk for speed; sort within dirs
@@ -34,6 +43,29 @@ pub fn walk(root: &Path) -> Result<ScanTree> {
     for entry in WalkDir::new(&canonical)
         .sort(true)
         .skip_hidden(false)
+        .process_read_dir(move |_depth, _path, _state, children| {
+            // Prevent descent into directories that live on a different
+            // filesystem device (e.g. APFS sub-volumes under /System/Volumes,
+            // or network mounts). Setting read_children_path = None stops
+            // jwalk from enumerating those subtrees entirely.
+            children.iter_mut().for_each(|child_result| {
+                if let Ok(child) = child_result {
+                    if child.file_type().is_dir() {
+                        let on_same_device = child
+                            .metadata()
+                            .map(|m| m.dev() == root_dev)
+                            .unwrap_or(true); // on error, assume same and let natural errors surface
+                        if !on_same_device {
+                            eprintln!(
+                                "[strata-scan] skipping cross-device mount: {}",
+                                child.path().display()
+                            );
+                            child.read_children_path = None;
+                        }
+                    }
+                }
+            });
+        })
         .into_iter()
     {
         let entry = match entry {
@@ -42,6 +74,13 @@ pub fn walk(root: &Path) -> Result<ScanTree> {
         };
         if !entry.file_type().is_dir() {
             continue;
+        }
+        // Skip entries that are on a different device (the process_read_dir
+        // callback above prevents descent; this check skips the entry itself).
+        if let Some(dev) = entry.metadata().ok().map(|m| m.dev()) {
+            if dev != root_dev {
+                continue;
+            }
         }
 
         let path = entry.path();
@@ -119,6 +158,21 @@ pub fn walk(root: &Path) -> Result<ScanTree> {
     for entry in WalkDir::new(&canonical)
         .sort(true)
         .skip_hidden(false)
+        .process_read_dir(move |_depth, _path, _state, children| {
+            children.iter_mut().for_each(|child_result| {
+                if let Ok(child) = child_result {
+                    if child.file_type().is_dir() {
+                        let on_same_device = child
+                            .metadata()
+                            .map(|m| m.dev() == root_dev)
+                            .unwrap_or(true);
+                        if !on_same_device {
+                            child.read_children_path = None;
+                        }
+                    }
+                }
+            });
+        })
         .into_iter()
     {
         let entry = match entry {

@@ -21,6 +21,7 @@ use crate::timemachine::TmChecker;
 use anyhow::Result;
 use jwalk::WalkDir;
 use std::collections::HashMap;
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 /// Knobs that disable expensive probes (used by tests and `--no-*` CLI flags).
@@ -127,8 +128,30 @@ pub fn run(
             kind: "hash".into(),
         });
         // Walk the root once more to enumerate large files.
+        // Use the same device-boundary guard as the walker to avoid crossing
+        // into APFS sub-volumes or network mounts.
+        let root_dev: u64 = std::fs::metadata(root).map(|m| m.dev()).unwrap_or(0);
         let mut large_files = Vec::new();
-        for entry in WalkDir::new(root).skip_hidden(false).into_iter().flatten() {
+        for entry in WalkDir::new(root)
+            .skip_hidden(false)
+            .process_read_dir(move |_depth, _path, _state, children| {
+                children.iter_mut().for_each(|child_result| {
+                    if let Ok(child) = child_result {
+                        if child.file_type().is_dir() {
+                            let on_same_device = child
+                                .metadata()
+                                .map(|m| m.dev() == root_dev)
+                                .unwrap_or(true);
+                            if !on_same_device {
+                                child.read_children_path = None;
+                            }
+                        }
+                    }
+                });
+            })
+            .into_iter()
+            .flatten()
+        {
             if !entry.file_type().is_file() {
                 continue;
             }
