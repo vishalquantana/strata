@@ -9,15 +9,29 @@
 
 use crate::junk::is_known_junk;
 use crate::model::{DirNode, NodeId, ScanTree, Signals};
+use crate::progress::ProgressEvent;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use jwalk::WalkDir;
 use std::collections::HashMap;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
+use std::time::{Duration, Instant};
+
+/// Minimum wall-clock interval between `WalkProgress` emissions.
+const THROTTLE_INTERVAL: Duration = Duration::from_millis(250);
+/// Minimum number of nodes processed between `WalkProgress` emissions.
+/// On tiny/fast scans the final flush is sufficient; this gate suppresses
+/// spurious mid-walk events.
+const THROTTLE_MIN_NODES: u64 = 1000;
 
 /// Walk the given root and return the populated scan tree.
-pub fn walk(root: &Path) -> Result<ScanTree> {
+///
+/// `progress_cb` is called with `WalkProgress` events throttled to roughly
+/// once per 250 ms (and at least 1 000 nodes between emissions).  A final
+/// flush is emitted immediately before the function returns so the UI always
+/// shows consistent totals.
+pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result<ScanTree> {
     let scanned_at = Utc::now();
     let canonical = root
         .canonicalize()
@@ -30,6 +44,38 @@ pub fn walk(root: &Path) -> Result<ScanTree> {
     let root_dev: u64 = std::fs::metadata(&canonical)
         .with_context(|| format!("failed to stat {}", canonical.display()))?
         .dev();
+
+    // Throttle state — shared across both passes.
+    let mut dirs_seen: u64 = 0;
+    let mut files_seen: u64 = 0;
+    let mut bytes_seen: u64 = 0;
+    let mut nodes_since_last_emit: u64 = 0;
+    let mut last_emit = Instant::now();
+
+    // Emit an initial zeroed WalkProgress so the UI shows counters immediately.
+    progress_cb(&ProgressEvent::WalkProgress {
+        dirs_seen: 0,
+        files_seen: 0,
+        bytes_seen: 0,
+    });
+
+    // Helper: emit a WalkProgress if both throttle gates are open.
+    // Returns true if an event was emitted (so caller can reset the node counter).
+    macro_rules! maybe_emit {
+        ($cb:expr) => {{
+            if nodes_since_last_emit >= THROTTLE_MIN_NODES
+                && last_emit.elapsed() >= THROTTLE_INTERVAL
+            {
+                $cb(&ProgressEvent::WalkProgress {
+                    dirs_seen,
+                    files_seen,
+                    bytes_seen,
+                });
+                last_emit = Instant::now();
+                nodes_since_last_emit = 0;
+            }
+        }};
+    }
 
     // First pass: enumerate every directory, build flat node list, capture
     // each dir's own metadata. Use parallel walk for speed; sort within dirs
@@ -147,6 +193,11 @@ pub fn walk(root: &Path) -> Result<ScanTree> {
         if let Some(pid) = parent_id {
             nodes[pid as usize].children.push(id);
         }
+
+        // Update running counters for Pass 1 (directory accepted).
+        dirs_seen += 1;
+        nodes_since_last_emit += 1;
+        maybe_emit!(progress_cb);
     }
 
     if nodes.is_empty() {
@@ -210,7 +261,21 @@ pub fn walk(root: &Path) -> Result<ScanTree> {
                 }
             }
         }
+
+        // Update running counters for Pass 2 (file accepted).
+        files_seen += 1;
+        bytes_seen += size;
+        nodes_since_last_emit += 1;
+        maybe_emit!(progress_cb);
     }
+
+    // Final flush: emit current totals right before returning so the UI always
+    // sees consistent numbers regardless of throttle timing.
+    progress_cb(&ProgressEvent::WalkProgress {
+        dirs_seen,
+        files_seen,
+        bytes_seen,
+    });
 
     // Third pass: roll subtree totals up. Process leaves before parents.
     let mut order: Vec<NodeId> = (0..nodes.len() as NodeId).collect();

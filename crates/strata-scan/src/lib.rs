@@ -56,7 +56,7 @@ pub fn run(
     progress_cb(&ProgressEvent::WalkStarted {
         root: root.to_string_lossy().to_string(),
     });
-    let mut tree = walker::walk(root)?;
+    let mut tree = walker::walk(root, &mut progress_cb)?;
     progress_cb(&ProgressEvent::WalkCompleted {
         node_count: tree.nodes.len(),
     });

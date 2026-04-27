@@ -36,7 +36,7 @@ fn build_fixture() -> tempfile::TempDir {
 #[test]
 fn walks_and_aggregates_sizes() {
     let dir = build_fixture();
-    let tree = walk(dir.path()).unwrap();
+    let tree = walk(dir.path(), &mut |_| {}).unwrap();
 
     let root = &tree.nodes[tree.root_id as usize];
     assert_eq!(root.size_bytes, 100 + 200 + 50 + 1000);
@@ -51,7 +51,7 @@ fn walks_and_aggregates_sizes() {
 #[test]
 fn child_dirs_have_correct_sizes() {
     let dir = build_fixture();
-    let tree = walk(dir.path()).unwrap();
+    let tree = walk(dir.path(), &mut |_| {}).unwrap();
 
     let sub = tree
         .nodes
@@ -67,7 +67,7 @@ fn child_dirs_have_correct_sizes() {
 #[test]
 fn flags_junk_directories() {
     let dir = build_fixture();
-    let tree = walk(dir.path()).unwrap();
+    let tree = walk(dir.path(), &mut |_| {}).unwrap();
 
     let nm = tree
         .nodes
@@ -86,8 +86,9 @@ fn flags_junk_directories() {
 
 #[test]
 fn returns_empty_tree_for_nonexistent_path() {
-    let result = walk(std::path::Path::new(
-        "/tmp/definitely-does-not-exist-xyz123",
-    ));
+    let result = walk(
+        std::path::Path::new("/tmp/definitely-does-not-exist-xyz123"),
+        &mut |_| {},
+    );
     assert!(result.is_err());
 }
