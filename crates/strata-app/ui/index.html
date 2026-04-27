@@ -125,6 +125,27 @@
         from { transform: translateX(20px); opacity: 0; }
         to { transform: translateX(0); opacity: 1; }
       }
+
+      .ctx-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 6px 12px;
+        background: transparent;
+        border: 0;
+        color: #d8d8e0;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .ctx-item:hover { background: #1a1a22; }
+
+      button:focus-visible {
+        outline: 2px solid #6c8cff;
+        outline-offset: 2px;
+      }
+      button { transition: transform 0.1s ease, opacity 0.15s ease; }
+      button:active:not(:disabled) { transform: translateY(1px); }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
   </head>
   <body>

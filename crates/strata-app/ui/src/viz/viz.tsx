@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onMount, onCleanup } from "solid-js";
+import { createEffect, createSignal, onMount, onCleanup, Show } from "solid-js";
 import type { DirNode, ScanTree } from "../types";
 import { setupCanvas, clear } from "./canvas";
 import { buildHierarchy } from "./hierarchy";
@@ -11,6 +11,12 @@ import Toggle, { type VizMode } from "../components/toggle";
 import HoverPeek from "../components/hover-peek";
 import { makeMatcher } from "../stores/filters";
 import { selectionStore } from "../stores/selection";
+import { revealInFinder, moveToTrash } from "../ipc";
+
+// Module-level context menu state (so app.tsx can dismiss it on ESC).
+const [ctxMenu, setCtxMenu] = createSignal<{ x: number; y: number; nodeId: number } | null>(null);
+export function dismissCtxMenu() { setCtxMenu(null); }
+export function ctxMenuOpen(): boolean { return ctxMenu() !== null; }
 
 interface Props {
   tree: ScanTree;
@@ -149,6 +155,7 @@ export default function Viz(props: Props) {
   }
 
   function onClick() {
+    if (ctxMenu() !== null) { setCtxMenu(null); return; }
     const id = hoveredId();
     if (id === null) {
       sel.select(null);
@@ -173,6 +180,12 @@ export default function Viz(props: Props) {
         onMouseMove={onMove}
         onMouseLeave={() => { setHoveredId(null); setCursor(null); }}
         onClick={onClick}
+        oncontextmenu={(e) => {
+          e.preventDefault();
+          const id = hoveredId();
+          if (id === null) { setCtxMenu(null); return; }
+          setCtxMenu({ x: e.clientX, y: e.clientY, nodeId: id });
+        }}
         style={{ width: "100%", height: "100%", display: "block", cursor: "pointer" }}
       />
       <Toggle mode={mode()} onChange={startMorph} />
@@ -186,6 +199,33 @@ export default function Viz(props: Props) {
           y={cursor()!.y}
         />
       )}
+      <Show when={ctxMenu()}>
+        {(m) => {
+          const node = nodesById.get(m().nodeId);
+          if (!node) return null;
+          return (
+            <div
+              style={{
+                position: "fixed",
+                left: `${m().x}px`,
+                top: `${m().y}px`,
+                background: "#0d0d12",
+                border: "1px solid #1a1a22",
+                padding: "4px 0",
+                "border-radius": "6px",
+                "box-shadow": "0 8px 24px rgba(0,0,0,0.5)",
+                "z-index": 100,
+                "min-width": "180px",
+              }}
+              onMouseLeave={() => setCtxMenu(null)}
+            >
+              <button class="ctx-item" onClick={() => { revealInFinder(node.path); setCtxMenu(null); }}>Reveal in Finder</button>
+              <button class="ctx-item" onClick={async () => { await moveToTrash(node.path); setCtxMenu(null); }}>Move to Trash…</button>
+              <button class="ctx-item" onClick={() => { navigator.clipboard.writeText(node.path); setCtxMenu(null); }}>Copy path</button>
+            </div>
+          );
+        }}
+      </Show>
     </div>
   );
 }
