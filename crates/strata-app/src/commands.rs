@@ -1,7 +1,7 @@
 //! Tauri command handlers exposed to the WebView.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
@@ -44,6 +44,8 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
     Command::new("open")
         .arg("-R")
         .arg(&path)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|e| format!("Failed to invoke open: {e}"))?;
     Ok(())
@@ -64,6 +66,8 @@ pub fn check_full_disk_access() -> FdaStatus {
 pub fn open_fda_settings() -> Result<(), String> {
     Command::new("open")
         .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|e| format!("Failed to open Settings: {e}"))?;
     Ok(())

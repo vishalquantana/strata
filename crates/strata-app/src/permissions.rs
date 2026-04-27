@@ -23,24 +23,16 @@ pub fn check() -> FdaStatus {
         Ok(h) => h,
         Err(_) => return FdaStatus::Unknown,
     };
-    let canary = PathBuf::from(home).join("Library").join("Mail");
-    if !canary.exists() {
-        // No Mail directory at all (e.g., user never ran Mail.app). Try
-        // ~/Library/Application Support/com.apple.TCC instead.
-        return probe_tcc();
-    }
+    let canary = PathBuf::from(&home).join("Library").join("Mail");
     match fs::read_dir(&canary) {
         Ok(_) => FdaStatus::Granted,
         Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => FdaStatus::Denied,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => probe_tcc(&home),
         Err(_) => FdaStatus::Unknown,
     }
 }
 
-fn probe_tcc() -> FdaStatus {
-    let home = match std::env::var("HOME") {
-        Ok(h) => h,
-        Err(_) => return FdaStatus::Unknown,
-    };
+fn probe_tcc(home: &str) -> FdaStatus {
     let tcc = PathBuf::from(home)
         .join("Library/Application Support/com.apple.TCC");
     match fs::read_dir(&tcc) {
