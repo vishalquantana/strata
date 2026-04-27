@@ -11,6 +11,8 @@ import Toggle, { type VizMode } from "../components/toggle";
 
 interface Props {
   tree: ScanTree;
+  initialRootId: number;
+  onZoomChange: (id: number) => void;
 }
 
 const MORPH_DURATION_MS = 600;
@@ -18,7 +20,7 @@ const MORPH_DURATION_MS = 600;
 export default function Viz(props: Props) {
   let canvasRef: HTMLCanvasElement | undefined;
   const [hoveredId, setHoveredId] = createSignal<number | null>(null);
-  const [zoomRoot, setZoomRoot] = createSignal<number>(props.tree.root_id);
+  const [zoomRoot, setZoomRoot] = createSignal<number>(props.initialRootId);
   const [mode, setMode] = createSignal<VizMode>("treemap");
 
   let rects: Rect[] = [];
@@ -106,6 +108,14 @@ export default function Viz(props: Props) {
   createEffect(() => {
     zoomRoot();
     relayout();
+  });
+  createEffect(() => {
+    props.onZoomChange(zoomRoot());
+  });
+  createEffect(() => {
+    if (props.initialRootId !== zoomRoot()) {
+      setZoomRoot(props.initialRootId);
+    }
   });
 
   function onMove(e: MouseEvent) {
