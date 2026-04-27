@@ -3,71 +3,117 @@ import type { DirNode, ScanTree } from "../types";
 import { setupCanvas, clear } from "./canvas";
 import { buildHierarchy } from "./hierarchy";
 import { computeTreemap, type Rect } from "./layout-treemap";
-import { renderTreemap } from "./render";
-import { hitTest } from "./hit-test";
+import { computeSunburst, type Arc } from "./layout-sunburst";
+import { render, type Shape } from "./render";
+import { hitTestRects, hitTestArcs } from "./hit-test";
+import { buildMorphShapes, easeInOutCubic } from "./morph";
+import Toggle, { type VizMode } from "../components/toggle";
 
 interface Props {
   tree: ScanTree;
 }
 
+const MORPH_DURATION_MS = 600;
+
 export default function Viz(props: Props) {
   let canvasRef: HTMLCanvasElement | undefined;
   const [hoveredId, setHoveredId] = createSignal<number | null>(null);
   const [zoomRoot, setZoomRoot] = createSignal<number>(props.tree.root_id);
+  const [mode, setMode] = createSignal<VizMode>("treemap");
 
   let rects: Rect[] = [];
+  let arcs: Arc[] = [];
   let nodesById = new Map<number, DirNode>();
   let ctx: CanvasRenderingContext2D | null = null;
   let cssWidth = 0;
   let cssHeight = 0;
 
+  let morphFrom: VizMode | null = null;
+  let morphStart = 0;
+  let rafId: number | null = null;
+
   function relayout() {
     if (!canvasRef || !ctx) return;
-    const rect = canvasRef.getBoundingClientRect();
-    cssWidth = rect.width;
-    cssHeight = rect.height;
+    const r = canvasRef.getBoundingClientRect();
+    cssWidth = r.width;
+    cssHeight = r.height;
     nodesById = new Map(props.tree.nodes.map((n) => [n.id, n]));
     const h = buildHierarchy(props.tree, zoomRoot());
     rects = computeTreemap(h, cssWidth, cssHeight);
-    draw();
+    arcs = computeSunburst(h, cssWidth, cssHeight);
+    drawCurrent();
   }
 
-  function draw() {
+  function shapesForMode(m: VizMode): Shape[] {
+    if (m === "treemap") {
+      return rects.map((r) => ({ kind: "rect" as const, rect: r, id: r.id }));
+    }
+    return arcs.map((a) => ({ kind: "arc" as const, arc: a, id: a.id }));
+  }
+
+  function drawCurrent() {
     if (!ctx) return;
     clear(ctx, cssWidth, cssHeight);
-    renderTreemap(ctx, { rects, nodesById, hoveredId: hoveredId() });
+    render(ctx, { shapes: shapesForMode(mode()), nodesById, hoveredId: hoveredId() });
+  }
+
+  function startMorph(to: VizMode) {
+    if (mode() === to) return;
+    morphFrom = mode();
+    morphStart = performance.now();
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    const tick = (now: number) => {
+      const elapsed = now - morphStart;
+      const tRaw = Math.min(1, elapsed / MORPH_DURATION_MS);
+      const t = easeInOutCubic(tRaw);
+      const tDirected = morphFrom === "treemap" ? t : 1 - t;
+      if (!ctx) return;
+      clear(ctx, cssWidth, cssHeight);
+      const shapes = buildMorphShapes(rects, arcs, tDirected);
+      render(ctx, { shapes, nodesById, hoveredId: null });
+      if (tRaw < 1) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        setMode(to);
+        morphFrom = null;
+        rafId = null;
+        drawCurrent();
+      }
+    };
+    rafId = requestAnimationFrame(tick);
   }
 
   onMount(() => {
     if (!canvasRef) return;
     ctx = setupCanvas(canvasRef);
     relayout();
-
     const ro = new ResizeObserver(() => {
       if (!canvasRef || !ctx) return;
       ctx = setupCanvas(canvasRef);
       relayout();
     });
     ro.observe(canvasRef);
-    onCleanup(() => ro.disconnect());
+    onCleanup(() => {
+      ro.disconnect();
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    });
   });
 
   createEffect(() => {
     hoveredId();
-    draw();
+    if (morphFrom === null) drawCurrent();
   });
-
   createEffect(() => {
     zoomRoot();
     relayout();
   });
 
   function onMove(e: MouseEvent) {
-    if (!canvasRef) return;
+    if (!canvasRef || morphFrom !== null) return;
     const r = canvasRef.getBoundingClientRect();
     const x = e.clientX - r.left;
     const y = e.clientY - r.top;
-    const id = hitTest(rects, x, y);
+    const id = mode() === "treemap" ? hitTestRects(rects, x, y) : hitTestArcs(arcs, x, y);
     setHoveredId(id);
   }
 
@@ -75,18 +121,14 @@ export default function Viz(props: Props) {
     const id = hoveredId();
     if (id === null) return;
     const node = nodesById.get(id);
-    if (!node) return;
-    if (node.children.length > 0) {
-      setZoomRoot(id);
-    }
+    if (!node || node.children.length === 0) return;
+    setZoomRoot(id);
   }
 
   function zoomOut() {
     const cur = zoomRoot();
     const node = nodesById.get(cur);
-    if (node && node.parent_id !== null) {
-      setZoomRoot(node.parent_id);
-    }
+    if (node && node.parent_id !== null) setZoomRoot(node.parent_id);
   }
 
   return (
@@ -98,6 +140,7 @@ export default function Viz(props: Props) {
         onClick={onClick}
         style={{ width: "100%", height: "100%", display: "block", cursor: "pointer" }}
       />
+      <Toggle mode={mode()} onChange={startMorph} />
       {zoomRoot() !== props.tree.root_id && (
         <button onClick={zoomOut} style={zoomBtn}>← Back</button>
       )}
@@ -106,9 +149,7 @@ export default function Viz(props: Props) {
 }
 
 const zoomBtn = {
-  position: "absolute",
-  top: "12px",
-  left: "12px",
+  position: "absolute", top: "12px", left: "12px",
   background: "rgba(13,13,18,0.85)",
   border: "1px solid #1a1a22",
   color: "#e5e7eb",
