@@ -13,6 +13,7 @@ import Breadcrumb from "./components/breadcrumb";
 import Sidebar from "./components/sidebar";
 import DetailsPanel from "./components/details-panel";
 import QuickPicker from "./components/quick-picker";
+import ScanningState from "./components/scanning-state";
 import { selectionStore } from "./stores/selection";
 
 export default function App() {
@@ -73,11 +74,10 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     onCleanup(() => window.removeEventListener("keydown", onKey));
 
-    // run async setup separately so onCleanup above is registered synchronously
+    // Register scan event listeners FIRST so they're ready before any scan
+    // can be triggered. The FDA check follows. Otherwise a granted-FDA cold
+    // start can race with the listener registration and lose early events.
     void (async () => {
-      const initial = await checkFullDiskAccess();
-      setHasFda(initial === "granted");
-      setFdaChecked(true);
       await onScanProgress((ev) => setEvent(ev));
       await onScanComplete(async (t) => {
         setTree(t);
@@ -100,6 +100,11 @@ export default function App() {
           startScan(t.source_path);
         }, 1500);
       });
+      // FDA check runs AFTER listeners are wired so the main UI can't render
+      // (and the user can't click a preset) until events can be received.
+      const initial = await checkFullDiskAccess();
+      setHasFda(initial === "granted");
+      setFdaChecked(true);
     })();
   });
 
@@ -151,6 +156,13 @@ export default function App() {
           <main style={{ flex: 1, display: "flex", "flex-direction": "column", "min-width": 0 }}>
             <Show when={!tree() && !scanning()}>
               <QuickPicker onPick={(p) => { void scanPath(p); }} onCustom={handlePick} />
+            </Show>
+            <Show when={scanning() && !tree()}>
+              <ScanningState
+                path={lastScannedPath()}
+                event={event()}
+                onCancel={() => { setScanning(false); setEvent(null); }}
+              />
             </Show>
             <Show when={tree() && currentRoot() !== null}>
               <Viz tree={tree()!} initialRootId={currentRoot()!} onZoomChange={setCurrentRoot} />
