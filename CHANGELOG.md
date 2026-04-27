@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-04-27
+
+### Changed
+- **Scrollable biggest-files list during scan.** Backend now tracks the top
+  200 biggest files (was 30) and the frontend renders the full list in a
+  scrollable container capped at ~10 rows tall, so you can scroll past the
+  first screenful and keep deleting. Section title now shows the live count
+  (e.g. "Biggest files found (47)").
+
 ## [0.3.4] - 2026-04-27
 
 ### Changed
@@ -170,7 +179,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drill-down / zoom-out via click and breadcrumb
 - Volume listing via `sysinfo`
 
-[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/vishalquantana/strata/releases/tag/v0.3.5
 [0.3.4]: https://github.com/vishalquantana/strata/releases/tag/v0.3.4
 [0.3.3]: https://github.com/vishalquantana/strata/releases/tag/v0.3.3
 [0.3.2]: https://github.com/vishalquantana/strata/releases/tag/v0.3.2

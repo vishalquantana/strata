@@ -57,7 +57,7 @@ export default function ScanningState(props: Props) {
 
   const visibleFiles = createMemo(() => {
     const files = props.snapshot?.biggestFiles ?? [];
-    return files.filter((f) => !isDeleted(f.path)).slice(0, 10);
+    return files.filter((f) => !isDeleted(f.path));
   });
 
   const handleTrash = async (path: string) => {
@@ -114,7 +114,7 @@ export default function ScanningState(props: Props) {
 
         {/* Biggest files */}
         <Show when={visibleFiles().length > 0}>
-          <Section title="Biggest files found">
+          <Section title={`Biggest files found (${visibleFiles().length})`}>
             <ol style={fileList}>
               <For each={visibleFiles()}>
                 {(f) => (
@@ -377,6 +377,11 @@ const fileList = {
   display: "flex",
   "flex-direction": "column",
   gap: "2px",
+  // Cap at ~10 rows tall and let the user scroll further; the backend now
+  // tracks up to 200 biggest files, so there is real content below the fold.
+  "max-height": "360px",
+  "overflow-y": "auto",
+  "overscroll-behavior": "contain",
 } as const;
 
 const fileRow = {

@@ -31,8 +31,10 @@ const SNAPSHOT_INTERVAL: Duration = Duration::from_secs(30);
 /// Delay before the very first snapshot, so the UI shows a treemap quickly
 /// rather than waiting a full SNAPSHOT_INTERVAL.
 const SNAPSHOT_FIRST_DELAY: Duration = Duration::from_secs(5);
-/// How many biggest files to track and report in each snapshot.
-const SNAPSHOT_TOP_FILES: usize = 30;
+/// How many biggest files to track and report in each snapshot. The frontend
+/// renders these in a scrollable list so the user can drill past the first
+/// screenful of large items.
+const SNAPSHOT_TOP_FILES: usize = 200;
 /// How many top-level directories to report in each snapshot.
 const SNAPSHOT_TOP_DIRS: usize = 12;
 /// Files smaller than this are not considered for the "biggest files" list
