@@ -5,6 +5,13 @@ use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
 use crate::scan_runner;
+use crate::volumes::{list_volumes as list_volumes_impl, Volume};
+
+/// Enumerate mounted disks for the disk-picker UI.
+#[tauri::command]
+pub fn list_volumes() -> Vec<Volume> {
+    list_volumes_impl()
+}
 
 /// Open a folder-picker dialog. Returns the selected path or None.
 #[tauri::command]

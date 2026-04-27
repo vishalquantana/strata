@@ -1,10 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { ProgressEvent, ScanTree } from "./types";
+import type { ProgressEvent, ScanTree, Volume } from "./types";
 
 export async function pickDirectory(): Promise<string | null> {
   const r = await invoke<string | null>("pick_directory");
   return r ?? null;
+}
+
+export async function listVolumes(): Promise<Volume[]> {
+  return await invoke<Volume[]>("list_volumes");
 }
 
 export async function startScan(path: string): Promise<void> {

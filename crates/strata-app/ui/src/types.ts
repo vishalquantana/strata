@@ -31,6 +31,16 @@ export interface ScanTree {
   source_path: string;
 }
 
+export interface Volume {
+  name: string;
+  path: string;
+  total_bytes: number;
+  free_bytes: number;
+  used_bytes: number;
+  is_removable: boolean;
+  is_internal: boolean;
+}
+
 export type ProgressEvent =
   | { event: "walk_started"; root: string }
   | { event: "walk_progress"; dirs_seen: number; files_seen: number; bytes_seen: number }

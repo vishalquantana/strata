@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Strata · Icon Mockups</title>
+<style>
+  :root {
+    --bg: #08080b;
+    --panel: #0f0f15;
+    --border: #1a1a22;
+    --text: #e5e7eb;
+    --dim: #6b7280;
+    --accent: #6c8cff;
+  }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    padding: 28px 32px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  h1 { margin: 0 0 6px; font-weight: 700; letter-spacing: -0.5px; font-size: 22px; }
+  .sub { color: var(--dim); font-size: 13px; margin: 0; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 18px;
+    padding: 24px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .label { display: flex; align-items: baseline; gap: 10px; }
+  .label .num {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+    color: var(--accent); text-transform: uppercase;
+  }
+  .label .name { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .desc { color: var(--dim); font-size: 12px; line-height: 1.5; margin: 0; }
+  .sizes {
+    display: flex; align-items: flex-end; gap: 24px;
+    padding: 18px 4px 4px;
+    flex-wrap: wrap;
+  }
+  .size-block { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .size-block .lbl { font-size: 10px; color: var(--dim); }
+  .icon-frame {
+    border-radius: 22%; /* approximates Apple's superellipse roundness */
+    overflow: hidden;
+    background: #000;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  }
+  .icon-128 .icon-frame { width: 128px; height: 128px; border-radius: 28px; }
+  .icon-64  .icon-frame { width: 64px;  height: 64px;  border-radius: 14px; }
+  .icon-32  .icon-frame { width: 32px;  height: 32px;  border-radius: 7px; }
+  svg { display: block; }
+  .pick-row {
+    padding: 10px 32px 28px;
+    color: var(--dim);
+    font-size: 12px;
+  }
+  .pick-row code {
+    background: #1a1a22;
+    color: var(--text);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Strata · Icon Mockups</h1>
+  <p class="sub">Six concepts. Each rendered at 128, 64, and 32 px so you can judge how they hold up at small sizes.</p>
+</header>
+
+<div class="grid">
+
+  <!-- 1. Concentric strata (geological rings) -->
+  <div class="card">
+    <div class="label"><span class="num">01</span><span class="name">Concentric strata</span></div>
+    <p class="desc">Layered concentric rings — geological "strata" meets a filesystem rollup. Calm, calligraphic, reads at every size.</p>
+    <div class="sizes">
+      <div class="size-block icon-128"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="128" height="128">
+          <defs>
+            <linearGradient id="bg1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#1a1d2e"/>
+              <stop offset="100%" stop-color="#0a0a12"/>
+            </linearGradient>
+            <linearGradient id="ring1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#a78bfa"/>
+              <stop offset="100%" stop-color="#6c8cff"/>
+            </linearGradient>
+          </defs>
+          <rect width="128" height="128" fill="url(#bg1)"/>
+          <g fill="none" stroke="url(#ring1)" stroke-linecap="round">
+            <circle cx="64" cy="64" r="48" stroke-width="3" opacity="0.25"/>
+            <circle cx="64" cy="64" r="38" stroke-width="3.5" opacity="0.45"/>
+            <circle cx="64" cy="64" r="28" stroke-width="4" opacity="0.7"/>
+            <circle cx="64" cy="64" r="18" stroke-width="4.5" opacity="0.9"/>
+          </g>
+          <circle cx="64" cy="64" r="7" fill="url(#ring1)"/>
+        </svg>
+      </div><div class="lbl">128</div></div>
+      <div class="size-block icon-64"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="64" height="64">
+          <rect width="128" height="128" fill="url(#bg1)"/>
+          <g fill="none" stroke="url(#ring1)" stroke-linecap="round">
+            <circle cx="64" cy="64" r="48" stroke-width="3" opacity="0.25"/>
+            <circle cx="64" cy="64" r="38" stroke-width="3.5" opacity="0.45"/>
+            <circle cx="64" cy="64" r="28" stroke-width="4" opacity="0.7"/>
+            <circle cx="64" cy="64" r="18" stroke-width="4.5" opacity="0.9"/>
+          </g>
+          <circle cx="64" cy="64" r="7" fill="url(#ring1)"/>
+        </svg>
+      </div><div class="lbl">64</div></div>
+      <div class="size-block icon-32"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="32" height="32">
+          <rect width="128" height="128" fill="url(#bg1)"/>
+          <g fill="none" stroke="url(#ring1)" stroke-linecap="round">
+            <circle cx="64" cy="64" r="48" stroke-width="3" opacity="0.25"/>
+            <circle cx="64" cy="64" r="38" stroke-width="3.5" opacity="0.45"/>
+            <circle cx="64" cy="64" r="28" stroke-width="4" opacity="0.7"/>
+            <circle cx="64" cy="64" r="18" stroke-width="4.5" opacity="0.9"/>
+          </g>
+          <circle cx="64" cy="64" r="7" fill="url(#ring1)"/>
+        </svg>
+      </div><div class="lbl">32</div></div>
+    </div>
+  </div>
+
+  <!-- 2. Sunburst pie -->
+  <div class="card">
+    <div class="label"><span class="num">02</span><span class="name">Sunburst pie</span></div>
+    <p class="desc">Direct echo of the sunburst visualization — wedges fan out from a bright core. The most literal "this app is about disk space breakdown."</p>
+    <div class="sizes">
+      <div class="size-block icon-128"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="128" height="128">
+          <defs>
+            <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#181a2b"/>
+              <stop offset="100%" stop-color="#08080d"/>
+            </linearGradient>
+            <radialGradient id="core2" cx="0.5" cy="0.5" r="0.5">
+              <stop offset="0%" stop-color="#dbe2ff"/>
+              <stop offset="100%" stop-color="#6c8cff"/>
+            </radialGradient>
+          </defs>
+          <rect width="128" height="128" fill="url(#bg2)"/>
+          <!-- outer ring of wedges -->
+          <g transform="translate(64 64)">
+            <path d="M0 0 L52 0 A52 52 0 0 1 36.77 36.77 Z" fill="#6c8cff" opacity="0.85"/>
+            <path d="M0 0 L36.77 36.77 A52 52 0 0 1 0 52 Z"  fill="#7e9bff" opacity="0.7"/>
+            <path d="M0 0 L0 52 A52 52 0 0 1 -36.77 36.77 Z" fill="#a78bfa" opacity="0.85"/>
+            <path d="M0 0 L-36.77 36.77 A52 52 0 0 1 -52 0 Z" fill="#9277e8" opacity="0.7"/>
+            <path d="M0 0 L-52 0 A52 52 0 0 1 -36.77 -36.77 Z" fill="#7e9bff" opacity="0.6"/>
+            <path d="M0 0 L-36.77 -36.77 A52 52 0 0 1 0 -52 Z"  fill="#6c8cff" opacity="0.5"/>
+            <path d="M0 0 L0 -52 A52 52 0 0 1 36.77 -36.77 Z"  fill="#a78bfa" opacity="0.55"/>
+            <path d="M0 0 L36.77 -36.77 A52 52 0 0 1 52 0 Z"   fill="#c4b3ff" opacity="0.65"/>
+          </g>
+          <circle cx="64" cy="64" r="14" fill="url(#core2)"/>
+        </svg>
+      </div><div class="lbl">128</div></div>
+      <div class="size-block icon-64"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="64" height="64">
+          <rect width="128" height="128" fill="url(#bg2)"/>
+          <g transform="translate(64 64)">
+            <path d="M0 0 L52 0 A52 52 0 0 1 36.77 36.77 Z" fill="#6c8cff" opacity="0.85"/>
+            <path d="M0 0 L36.77 36.77 A52 52 0 0 1 0 52 Z"  fill="#7e9bff" opacity="0.7"/>
+            <path d="M0 0 L0 52 A52 52 0 0 1 -36.77 36.77 Z" fill="#a78bfa" opacity="0.85"/>
+            <path d="M0 0 L-36.77 36.77 A52 52 0 0 1 -52 0 Z" fill="#9277e8" opacity="0.7"/>
+            <path d="M0 0 L-52 0 A52 52 0 0 1 -36.77 -36.77 Z" fill="#7e9bff" opacity="0.6"/>
+            <path d="M0 0 L-36.77 -36.77 A52 52 0 0 1 0 -52 Z"  fill="#6c8cff" opacity="0.5"/>
+            <path d="M0 0 L0 -52 A52 52 0 0 1 36.77 -36.77 Z"  fill="#a78bfa" opacity="0.55"/>
+            <path d="M0 0 L36.77 -36.77 A52 52 0 0 1 52 0 Z"   fill="#c4b3ff" opacity="0.65"/>
+          </g>
+          <circle cx="64" cy="64" r="14" fill="url(#core2)"/>
+        </svg>
+      </div><div class="lbl">64</div></div>
+      <div class="size-block icon-32"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="32" height="32">
+          <rect width="128" height="128" fill="url(#bg2)"/>
+          <g transform="translate(64 64)">
+            <path d="M0 0 L52 0 A52 52 0 0 1 36.77 36.77 Z" fill="#6c8cff" opacity="0.85"/>
+            <path d="M0 0 L36.77 36.77 A52 52 0 0 1 0 52 Z"  fill="#7e9bff" opacity="0.7"/>
+            <path d="M0 0 L0 52 A52 52 0 0 1 -36.77 36.77 Z" fill="#a78bfa" opacity="0.85"/>
+            <path d="M0 0 L-36.77 36.77 A52 52 0 0 1 -52 0 Z" fill="#9277e8" opacity="0.7"/>
+            <path d="M0 0 L-52 0 A52 52 0 0 1 -36.77 -36.77 Z" fill="#7e9bff" opacity="0.6"/>
+            <path d="M0 0 L-36.77 -36.77 A52 52 0 0 1 0 -52 Z"  fill="#6c8cff" opacity="0.5"/>
+            <path d="M0 0 L0 -52 A52 52 0 0 1 36.77 -36.77 Z"  fill="#a78bfa" opacity="0.55"/>
+            <path d="M0 0 L36.77 -36.77 A52 52 0 0 1 52 0 Z"   fill="#c4b3ff" opacity="0.65"/>
+          </g>
+          <circle cx="64" cy="64" r="14" fill="url(#core2)"/>
+        </svg>
+      </div><div class="lbl">32</div></div>
+    </div>
+  </div>
+
+  <!-- 3. Geological strata mountain -->
+  <div class="card">
+    <div class="label"><span class="num">03</span><span class="name">Geological strata</span></div>
+    <p class="desc">Earth-cross-section read of the name. Stacked horizontal bands like sedimentary rock — stronger metaphor, distinctive silhouette.</p>
+    <div class="sizes">
+      <div class="size-block icon-128"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="128" height="128">
+          <defs>
+            <linearGradient id="bg3" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#161824"/>
+              <stop offset="100%" stop-color="#0a0a14"/>
+            </linearGradient>
+          </defs>
+          <rect width="128" height="128" fill="url(#bg3)"/>
+          <g>
+            <rect x="14" y="32" width="100" height="10" rx="2" fill="#c4b3ff" opacity="0.95"/>
+            <rect x="14" y="46" width="100" height="14" rx="2" fill="#a78bfa" opacity="0.9"/>
+            <rect x="14" y="64" width="100" height="8"  rx="2" fill="#8e9dff" opacity="0.8"/>
+            <rect x="14" y="76" width="100" height="20" rx="2" fill="#6c8cff" opacity="1"/>
+            <rect x="14" y="100" width="100" height="6"  rx="2" fill="#4a5fd6" opacity="0.85"/>
+          </g>
+        </svg>
+      </div><div class="lbl">128</div></div>
+      <div class="size-block icon-64"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="64" height="64">
+          <rect width="128" height="128" fill="url(#bg3)"/>
+          <g>
+            <rect x="14" y="32" width="100" height="10" rx="2" fill="#c4b3ff" opacity="0.95"/>
+            <rect x="14" y="46" width="100" height="14" rx="2" fill="#a78bfa" opacity="0.9"/>
+            <rect x="14" y="64" width="100" height="8"  rx="2" fill="#8e9dff" opacity="0.8"/>
+            <rect x="14" y="76" width="100" height="20" rx="2" fill="#6c8cff" opacity="1"/>
+            <rect x="14" y="100" width="100" height="6"  rx="2" fill="#4a5fd6" opacity="0.85"/>
+          </g>
+        </svg>
+      </div><div class="lbl">64</div></div>
+      <div class="size-block icon-32"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="32" height="32">
+          <rect width="128" height="128" fill="url(#bg3)"/>
+          <g>
+            <rect x="14" y="32" width="100" height="10" rx="2" fill="#c4b3ff" opacity="0.95"/>
+            <rect x="14" y="46" width="100" height="14" rx="2" fill="#a78bfa" opacity="0.9"/>
+            <rect x="14" y="64" width="100" height="8"  rx="2" fill="#8e9dff" opacity="0.8"/>
+            <rect x="14" y="76" width="100" height="20" rx="2" fill="#6c8cff" opacity="1"/>
+            <rect x="14" y="100" width="100" height="6"  rx="2" fill="#4a5fd6" opacity="0.85"/>
+          </g>
+        </svg>
+      </div><div class="lbl">32</div></div>
+    </div>
+  </div>
+
+  <!-- 4. Treemap mosaic -->
+  <div class="card">
+    <div class="label"><span class="num">04</span><span class="name">Treemap mosaic</span></div>
+    <p class="desc">Abstract grid of unevenly-sized rectangles — the treemap layout itself, distilled. Implies "data" without spelling it out.</p>
+    <div class="sizes">
+      <div class="size-block icon-128"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="128" height="128">
+          <defs>
+            <linearGradient id="bg4" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#181a2c"/>
+              <stop offset="100%" stop-color="#08080d"/>
+            </linearGradient>
+          </defs>
+          <rect width="128" height="128" fill="url(#bg4)"/>
+          <g>
+            <rect x="14" y="14" width="58" height="58" rx="6" fill="#6c8cff"/>
+            <rect x="76" y="14" width="38" height="36" rx="5" fill="#a78bfa"/>
+            <rect x="76" y="54" width="22" height="18" rx="4" fill="#c4b3ff"/>
+            <rect x="102" y="54" width="12" height="18" rx="3" fill="#8e9dff"/>
+            <rect x="14" y="76" width="32" height="38" rx="5" fill="#a78bfa" opacity="0.85"/>
+            <rect x="50" y="76" width="48" height="22" rx="5" fill="#7e9bff"/>
+            <rect x="102" y="76" width="12" height="22" rx="3" fill="#c4b3ff" opacity="0.7"/>
+            <rect x="50" y="102" width="64" height="12" rx="4" fill="#4a5fd6"/>
+          </g>
+        </svg>
+      </div><div class="lbl">128</div></div>
+      <div class="size-block icon-64"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="64" height="64">
+          <rect width="128" height="128" fill="url(#bg4)"/>
+          <g>
+            <rect x="14" y="14" width="58" height="58" rx="6" fill="#6c8cff"/>
+            <rect x="76" y="14" width="38" height="36" rx="5" fill="#a78bfa"/>
+            <rect x="76" y="54" width="22" height="18" rx="4" fill="#c4b3ff"/>
+            <rect x="102" y="54" width="12" height="18" rx="3" fill="#8e9dff"/>
+            <rect x="14" y="76" width="32" height="38" rx="5" fill="#a78bfa" opacity="0.85"/>
+            <rect x="50" y="76" width="48" height="22" rx="5" fill="#7e9bff"/>
+            <rect x="102" y="76" width="12" height="22" rx="3" fill="#c4b3ff" opacity="0.7"/>
+            <rect x="50" y="102" width="64" height="12" rx="4" fill="#4a5fd6"/>
+          </g>
+        </svg>
+      </div><div class="lbl">64</div></div>
+      <div class="size-block icon-32"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="32" height="32">
+          <rect width="128" height="128" fill="url(#bg4)"/>
+          <g>
+            <rect x="14" y="14" width="58" height="58" rx="6" fill="#6c8cff"/>
+            <rect x="76" y="14" width="38" height="36" rx="5" fill="#a78bfa"/>
+            <rect x="76" y="54" width="22" height="18" rx="4" fill="#c4b3ff"/>
+            <rect x="102" y="54" width="12" height="18" rx="3" fill="#8e9dff"/>
+            <rect x="14" y="76" width="32" height="38" rx="5" fill="#a78bfa" opacity="0.85"/>
+            <rect x="50" y="76" width="48" height="22" rx="5" fill="#7e9bff"/>
+            <rect x="102" y="76" width="12" height="22" rx="3" fill="#c4b3ff" opacity="0.7"/>
+            <rect x="50" y="102" width="64" height="12" rx="4" fill="#4a5fd6"/>
+          </g>
+        </svg>
+      </div><div class="lbl">32</div></div>
+    </div>
+  </div>
+
+  <!-- 5. Stacked S monogram -->
+  <div class="card">
+    <div class="label"><span class="num">05</span><span class="name">Stacked S</span></div>
+    <p class="desc">Typographic mark: a chunky "S" sliced into horizontal layers. Wordmark + concept in one. Bold at any scale, very brand-friendly.</p>
+    <div class="sizes">
+      <div class="size-block icon-128"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="128" height="128">
+          <defs>
+            <linearGradient id="bg5" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#1a1d2e"/>
+              <stop offset="100%" stop-color="#0a0a14"/>
+            </linearGradient>
+            <linearGradient id="s5" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#c4b3ff"/>
+              <stop offset="100%" stop-color="#6c8cff"/>
+            </linearGradient>
+          </defs>
+          <rect width="128" height="128" fill="url(#bg5)"/>
+          <!-- S formed from horizontal slices with gaps -->
+          <g fill="url(#s5)">
+            <path d="M28 30 H100 V44 H42 V52 H100 V66 H86 V74 H28 V60 H86 V52 H28 Z" opacity="0"/>
+          </g>
+          <g fill="url(#s5)">
+            <rect x="28" y="28" width="72" height="13" rx="3"/>
+            <rect x="28" y="44" width="40" height="13" rx="3"/>
+            <rect x="28" y="60" width="72" height="13" rx="3"/>
+            <rect x="60" y="76" width="40" height="13" rx="3"/>
+            <rect x="28" y="92" width="72" height="13" rx="3"/>
+          </g>
+        </svg>
+      </div><div class="lbl">128</div></div>
+      <div class="size-block icon-64"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="64" height="64">
+          <rect width="128" height="128" fill="url(#bg5)"/>
+          <g fill="url(#s5)">
+            <rect x="28" y="28" width="72" height="13" rx="3"/>
+            <rect x="28" y="44" width="40" height="13" rx="3"/>
+            <rect x="28" y="60" width="72" height="13" rx="3"/>
+            <rect x="60" y="76" width="40" height="13" rx="3"/>
+            <rect x="28" y="92" width="72" height="13" rx="3"/>
+          </g>
+        </svg>
+      </div><div class="lbl">64</div></div>
+      <div class="size-block icon-32"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="32" height="32">
+          <rect width="128" height="128" fill="url(#bg5)"/>
+          <g fill="url(#s5)">
+            <rect x="28" y="28" width="72" height="13" rx="3"/>
+            <rect x="28" y="44" width="40" height="13" rx="3"/>
+            <rect x="28" y="60" width="72" height="13" rx="3"/>
+            <rect x="60" y="76" width="40" height="13" rx="3"/>
+            <rect x="28" y="92" width="72" height="13" rx="3"/>
+          </g>
+        </svg>
+      </div><div class="lbl">32</div></div>
+    </div>
+  </div>
+
+  <!-- 6. Disk + glow (literal) -->
+  <div class="card">
+    <div class="label"><span class="num">06</span><span class="name">Glowing disk</span></div>
+    <p class="desc">A glowing 3D disc/orb with a single bright slice. Cleanest read of "disk" — feels like macOS native iconography.</p>
+    <div class="sizes">
+      <div class="size-block icon-128"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="128" height="128">
+          <defs>
+            <radialGradient id="bg6" cx="0.5" cy="0.4" r="0.8">
+              <stop offset="0%" stop-color="#22253a"/>
+              <stop offset="100%" stop-color="#08080d"/>
+            </radialGradient>
+            <radialGradient id="orb6" cx="0.35" cy="0.3" r="0.75">
+              <stop offset="0%" stop-color="#dbe2ff"/>
+              <stop offset="40%" stop-color="#a78bfa"/>
+              <stop offset="100%" stop-color="#3b4ab0"/>
+            </radialGradient>
+            <radialGradient id="glow6" cx="0.5" cy="0.5" r="0.5">
+              <stop offset="0%" stop-color="#6c8cff" stop-opacity="0.6"/>
+              <stop offset="100%" stop-color="#6c8cff" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="128" height="128" fill="url(#bg6)"/>
+          <circle cx="64" cy="68" r="56" fill="url(#glow6)"/>
+          <circle cx="64" cy="64" r="44" fill="url(#orb6)"/>
+          <!-- bright slice -->
+          <path d="M64 64 L106 56 A44 44 0 0 1 96 96 Z" fill="#fff" opacity="0.18"/>
+          <!-- highlight -->
+          <ellipse cx="50" cy="46" rx="18" ry="10" fill="#fff" opacity="0.28"/>
+        </svg>
+      </div><div class="lbl">128</div></div>
+      <div class="size-block icon-64"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="64" height="64">
+          <rect width="128" height="128" fill="url(#bg6)"/>
+          <circle cx="64" cy="68" r="56" fill="url(#glow6)"/>
+          <circle cx="64" cy="64" r="44" fill="url(#orb6)"/>
+          <path d="M64 64 L106 56 A44 44 0 0 1 96 96 Z" fill="#fff" opacity="0.18"/>
+          <ellipse cx="50" cy="46" rx="18" ry="10" fill="#fff" opacity="0.28"/>
+        </svg>
+      </div><div class="lbl">64</div></div>
+      <div class="size-block icon-32"><div class="icon-frame">
+        <svg viewBox="0 0 128 128" width="32" height="32">
+          <rect width="128" height="128" fill="url(#bg6)"/>
+          <circle cx="64" cy="68" r="56" fill="url(#glow6)"/>
+          <circle cx="64" cy="64" r="44" fill="url(#orb6)"/>
+          <path d="M64 64 L106 56 A44 44 0 0 1 96 96 Z" fill="#fff" opacity="0.18"/>
+          <ellipse cx="50" cy="46" rx="18" ry="10" fill="#fff" opacity="0.28"/>
+        </svg>
+      </div><div class="lbl">32</div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="pick-row">
+  <strong style="color: var(--text)">To pick one:</strong> just say the number (e.g. <code>let's go with 03</code>). I'll then export it to <code>icons/icon.png</code> at 1024×1024 plus the macOS <code>.icns</code> sizes Tauri needs, and the dock icon updates on the next build.
+</div>
+
+</body>
+</html>

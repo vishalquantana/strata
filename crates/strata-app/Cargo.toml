@@ -18,6 +18,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 strata-scan = { path = "../strata-scan" }
 anyhow = "1"
+sysinfo = { version = "0.32", default-features = false, features = ["disk"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
