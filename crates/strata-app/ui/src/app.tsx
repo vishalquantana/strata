@@ -1,7 +1,7 @@
 import { createSignal, onMount, Show, createMemo } from "solid-js";
 import {
   pickDirectory, startScan, onScanProgress, onScanComplete, onScanError,
-  startWatching,
+  startWatching, onFsChange, type FsChange,
 } from "./ipc";
 import Onboarding from "./components/onboarding";
 import { checkFullDiskAccess } from "./ipc";
@@ -45,6 +45,17 @@ export default function App() {
     await onScanError((msg) => {
       setScanning(false);
       setEvent({ event: "error", message: msg });
+    });
+    let rescanTimer: number | undefined;
+    await onFsChange((_c: FsChange) => {
+      if (rescanTimer !== undefined) clearTimeout(rescanTimer);
+      rescanTimer = window.setTimeout(() => {
+        const t = tree();
+        if (!t || scanning()) return;
+        setScanning(true);
+        setEvent({ event: "walk_started", root: t.source_path });
+        startScan(t.source_path);
+      }, 1500);
     });
   });
 
