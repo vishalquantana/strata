@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-04-27
+
+### Added
+- **Move to Trash during scan.** Both treemap tiles (top-right corner of
+  each tile) and biggest-files rows now have a trash button. Click to
+  send the item to system Trash. The view updates immediately
+  (optimistically) and any further snapshot for that path is suppressed.
+- **Path-prefix deletion filter.** When a parent dir is trashed, any
+  biggest file whose path falls under it is hidden too, so the next
+  snapshot doesn't briefly resurface stale entries.
+
+### Changed
+- **Scanning view alignment redesign.** Single 760 px content column —
+  every section (header card, counters, treemap, biggest-files, phase
+  timeline) now locks to that column edge so the eye has a clean rail to
+  follow. Header is now a card with the ring on the left and title /
+  path / phase stacked on the right. Counters strip moved to a
+  full-width 4-cell layout with subtle dividers. Phase timeline uses
+  short labels (Walk · TM · iCloud · Spotlight · Dupes) and lives in a
+  matching card.
+- Biggest-files rows switched from flex to a 3-col grid
+  (name · size · actions) so the size column is always vertically
+  aligned regardless of filename length.
+
 ## [0.3.2] - 2026-04-27
 
 ### Added
@@ -128,7 +152,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drill-down / zoom-out via click and breadcrumb
 - Volume listing via `sysinfo`
 
-[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/vishalquantana/strata/releases/tag/v0.3.3
 [0.3.2]: https://github.com/vishalquantana/strata/releases/tag/v0.3.2
 [0.3.1]: https://github.com/vishalquantana/strata/releases/tag/v0.3.1
 [0.3.0]: https://github.com/vishalquantana/strata/releases/tag/v0.3.0

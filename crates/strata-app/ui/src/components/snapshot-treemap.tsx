@@ -7,6 +7,7 @@ interface Props {
   topDirs: TopDir[];
   width: number;
   height: number;
+  onTrash?: (path: string) => void;
 }
 
 interface Tile {
@@ -59,72 +60,105 @@ export default function SnapshotTreemap(props: Props) {
 
   return (
     <Show when={tiles().length > 0} fallback={<div style={emptyStyle}>Collecting…</div>}>
-      <svg
-        width={props.width}
-        height={props.height}
-        style={svgStyle}
-        viewBox={`0 0 ${props.width} ${props.height}`}
+      <div
+        style={{
+          position: "relative",
+          width: `${props.width}px`,
+          height: `${props.height}px`,
+          "border-radius": "10px",
+          overflow: "hidden",
+          border: "1px solid #1a1a22",
+          background: "#0d0d12",
+        }}
       >
         <For each={tiles()}>
           {(t) => {
-            const showLabel = t.w >= 60 && t.h >= 28;
-            const showSize = t.w >= 80 && t.h >= 44;
+            const showLabel = t.w >= 60 && t.h >= 32;
+            const showSize = t.w >= 80 && t.h >= 50;
+            const showActions = t.w >= 90 && t.h >= 60;
             return (
-              <g
-                style={{ cursor: "pointer" }}
+              <div
+                style={{
+                  position: "absolute",
+                  left: `${t.x}px`,
+                  top: `${t.y}px`,
+                  width: `${t.w}px`,
+                  height: `${t.h}px`,
+                  background: t.color,
+                  "border-radius": "4px",
+                  cursor: "pointer",
+                  overflow: "hidden",
+                  color: "#0d0d12",
+                  "box-sizing": "border-box",
+                  padding: "8px 10px",
+                  transition: "transform 200ms ease, opacity 200ms ease",
+                }}
+                title={`${t.dir.path} — ${formatBytes(t.dir.size_bytes)}`}
+                onClick={() => void revealInFinder(t.dir.path)}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   void revealInFinder(t.dir.path);
                 }}
-                onClick={() => void revealInFinder(t.dir.path)}
               >
-                <title>{`${t.dir.path} — ${formatBytes(t.dir.size_bytes)}`}</title>
-                <rect
-                  x={t.x}
-                  y={t.y}
-                  width={t.w}
-                  height={t.h}
-                  fill={t.color}
-                  rx={4}
-                  ry={4}
-                />
                 <Show when={showLabel}>
-                  <text
-                    x={t.x + 8}
-                    y={t.y + 16}
-                    fill="#0d0d12"
-                    font-size="11"
-                    font-weight="600"
-                    style={{ "pointer-events": "none" }}
+                  <div
+                    style={{
+                      "font-size": "11px",
+                      "font-weight": 600,
+                      "white-space": "nowrap",
+                      overflow: "hidden",
+                      "text-overflow": "ellipsis",
+                    }}
                   >
-                    {truncate(t.dir.name, Math.max(4, Math.floor(t.w / 7)))}
-                  </text>
+                    {t.dir.name}
+                  </div>
                 </Show>
                 <Show when={showSize}>
-                  <text
-                    x={t.x + 8}
-                    y={t.y + 30}
-                    fill="#0d0d12"
-                    font-size="10"
-                    font-weight="500"
-                    opacity="0.85"
-                    style={{ "pointer-events": "none", "font-variant-numeric": "tabular-nums" }}
+                  <div
+                    style={{
+                      "font-size": "10px",
+                      "font-weight": 500,
+                      opacity: 0.85,
+                      "font-variant-numeric": "tabular-nums",
+                      "margin-top": "2px",
+                    }}
                   >
                     {formatBytes(t.dir.size_bytes)}
-                  </text>
+                  </div>
                 </Show>
-              </g>
+                <Show when={showActions && props.onTrash}>
+                  <button
+                    style={trashTileBtn}
+                    title="Move to Trash"
+                    aria-label="Move to Trash"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      props.onTrash!(t.dir.path);
+                    }}
+                  >
+                    {trashIconSvg()}
+                  </button>
+                </Show>
+              </div>
             );
           }}
         </For>
-      </svg>
+      </div>
     </Show>
   );
 }
 
-function truncate(s: string, max: number): string {
-  if (s.length <= max) return s;
-  return s.slice(0, Math.max(1, max - 1)) + "…";
+function trashIconSvg() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  );
 }
 
 function formatBytes(b: number): string {
@@ -136,23 +170,33 @@ function formatBytes(b: number): string {
   return `${v.toFixed(v >= 100 ? 0 : 1)} ${u[i]}`;
 }
 
-const svgStyle = {
-  display: "block",
-  "border-radius": "8px",
-  overflow: "hidden",
-  border: "1px solid #1a1a22",
-  background: "#0d0d12",
-} as const;
-
 const emptyStyle = {
   display: "flex",
   "align-items": "center",
   "justify-content": "center",
-  height: "260px",
-  "border-radius": "8px",
+  height: "280px",
+  "border-radius": "10px",
   border: "1px solid #1a1a22",
   background: "#0d0d12",
   color: "#6b7280",
   "font-size": "12px",
   "font-family": "SF Mono, monospace",
+} as const;
+
+const trashTileBtn = {
+  position: "absolute",
+  top: "6px",
+  right: "6px",
+  background: "rgba(13, 13, 18, 0.4)",
+  border: "1px solid rgba(13, 13, 18, 0.4)",
+  color: "#0d0d12",
+  width: "22px",
+  height: "22px",
+  display: "inline-flex",
+  "align-items": "center",
+  "justify-content": "center",
+  "border-radius": "5px",
+  cursor: "pointer",
+  padding: 0,
+  "backdrop-filter": "blur(2px)",
 } as const;

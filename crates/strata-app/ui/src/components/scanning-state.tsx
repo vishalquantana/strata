@@ -1,6 +1,6 @@
-import { For, Show } from "solid-js";
+import { createMemo, createSignal, For, Show } from "solid-js";
 import type { BigFile, ProgressEvent, TopDir } from "../types";
-import { revealInFinder } from "../ipc";
+import { moveToTrash, revealInFinder } from "../ipc";
 import SnapshotTreemap from "./snapshot-treemap";
 
 export interface ScanCounters {
@@ -14,6 +14,7 @@ export type PhaseStatus = "pending" | "active" | "done";
 export interface PhaseEntry {
   id: string;
   label: string;
+  shortLabel: string;
   status: PhaseStatus;
 }
 
@@ -32,86 +33,142 @@ interface Props {
   onCancel: () => void;
 }
 
+// Single content column. Every section locks to this width so the eye has
+// one rail to follow.
+const COL_WIDTH = 760;
+
 export default function ScanningState(props: Props) {
   const currentPhase = () => props.phases.find((p) => p.status === "active");
 
+  // Paths the user has chosen to trash from inside the live scan view.
+  // Optimistic: removed immediately from the view. Hidden in subsequent
+  // snapshots too (path-prefix match).
+  const [deleted, setDeleted] = createSignal<string[]>([]);
+
+  const isDeleted = (path: string): boolean => {
+    const list = deleted();
+    return list.some((d) => path === d || path.startsWith(d + "/"));
+  };
+
+  const visibleTopDirs = createMemo(() => {
+    const dirs = props.snapshot?.topDirs ?? [];
+    return dirs.filter((d) => !isDeleted(d.path));
+  });
+
+  const visibleFiles = createMemo(() => {
+    const files = props.snapshot?.biggestFiles ?? [];
+    return files.filter((f) => !isDeleted(f.path)).slice(0, 10);
+  });
+
+  const handleTrash = async (path: string) => {
+    // Optimistic: hide immediately. If the trash call fails, we don't
+    // un-hide — the row would just reappear on the next snapshot.
+    setDeleted((d) => [...d, path]);
+    try {
+      await moveToTrash(path);
+    } catch (err) {
+      console.error("trash failed", path, err);
+    }
+  };
+
   return (
     <div style={wrap}>
-      <div style={topRow}>
-        <div class="scan-stage" style={{ "margin-right": "16px" }}>
-          <div class="scan-ring scan-ring-1" />
-          <div class="scan-ring scan-ring-2" />
-          <div class="scan-ring scan-ring-3" />
-          <div class="scan-core" />
+      <div style={column}>
+        {/* Header card */}
+        <div style={headerCard}>
+          <div class="scan-stage" style={ringWrap}>
+            <div class="scan-ring scan-ring-1" />
+            <div class="scan-ring scan-ring-2" />
+            <div class="scan-ring scan-ring-3" />
+            <div class="scan-core" />
+          </div>
+          <div style={headerText}>
+            <h2 style={title}>Scanning…</h2>
+            <p style={pathStyle}>{props.path ?? ""}</p>
+            <p style={phaseStyle}>{currentPhase()?.label ?? "Starting…"}</p>
+          </div>
         </div>
-        <div style={topRowText}>
-          <h2 style={title}>Scanning…</h2>
-          <p style={pathStyle}>{props.path ?? ""}</p>
-          <p style={phaseStyle}>{currentPhase()?.label ?? "Starting…"}</p>
+
+        {/* Counters strip */}
+        <div style={countersRow}>
+          <Counter label="Folders" value={props.counters.dirs.toLocaleString()} />
+          <Divider />
+          <Counter label="Files" value={props.counters.files.toLocaleString()} />
+          <Divider />
+          <Counter label="Size" value={formatBytes(props.counters.bytes)} />
+          <Divider />
+          <Counter label="Elapsed" value={formatElapsed(props.elapsedMs)} />
         </div>
-      </div>
 
-      <div style={countersRow}>
-        <Counter label="Folders" value={props.counters.dirs.toLocaleString()} />
-        <Counter label="Files" value={props.counters.files.toLocaleString()} />
-        <Counter label="Size" value={formatBytes(props.counters.bytes)} />
-        <Counter label="Elapsed" value={formatElapsed(props.elapsedMs)} />
-      </div>
+        {/* Top folders — 2D treemap */}
+        <Show when={visibleTopDirs().length > 0}>
+          <Section title="Top folders so far">
+            <SnapshotTreemap
+              topDirs={visibleTopDirs()}
+              width={COL_WIDTH}
+              height={280}
+              onTrash={handleTrash}
+            />
+          </Section>
+        </Show>
 
-      <Show when={(props.snapshot?.topDirs.length ?? 0) > 0}>
-        <Section title="Top folders so far">
-          <SnapshotTreemap
-            topDirs={props.snapshot!.topDirs}
-            width={780}
-            height={260}
-          />
-        </Section>
-      </Show>
-
-      <Show when={(props.snapshot?.biggestFiles.length ?? 0) > 0}>
-        <Section title="Biggest files found">
-          <ol style={fileList}>
-            <For each={props.snapshot!.biggestFiles.slice(0, 10)}>
-              {(f) => (
-                <li
-                  style={fileRow}
-                  title={`${f.path}\n\nRight-click or click the folder icon to reveal in Finder`}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    void revealInFinder(f.path);
-                  }}
-                >
-                  <span style={fileName}>{f.name}</span>
-                  <button
-                    style={revealBtn}
-                    onClick={(e) => { e.stopPropagation(); void revealInFinder(f.path); }}
-                    title="Reveal in Finder"
-                    aria-label="Reveal in Finder"
+        {/* Biggest files */}
+        <Show when={visibleFiles().length > 0}>
+          <Section title="Biggest files found">
+            <ol style={fileList}>
+              <For each={visibleFiles()}>
+                {(f) => (
+                  <li
+                    style={fileRow}
+                    title={`${f.path}\n\nRight-click to reveal in Finder`}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      void revealInFinder(f.path);
+                    }}
                   >
-                    {folderIconSvg()}
-                  </button>
-                  <span style={fileSize}>{formatBytes(f.size_bytes)}</span>
+                    <span style={fileName}>{f.name}</span>
+                    <span style={fileSize}>{formatBytes(f.size_bytes)}</span>
+                    <div style={rowActions}>
+                      <button
+                        style={iconBtn}
+                        onClick={(e) => { e.stopPropagation(); void revealInFinder(f.path); }}
+                        title="Reveal in Finder"
+                        aria-label="Reveal in Finder"
+                      >
+                        {folderIconSvg()}
+                      </button>
+                      <button
+                        style={iconBtnDanger}
+                        onClick={(e) => { e.stopPropagation(); void handleTrash(f.path); }}
+                        title="Move to Trash"
+                        aria-label="Move to Trash"
+                      >
+                        {trashIconSvg()}
+                      </button>
+                    </div>
+                  </li>
+                )}
+              </For>
+            </ol>
+          </Section>
+        </Show>
+
+        {/* Phase timeline */}
+        <Show when={props.phases.length > 0}>
+          <ol style={timeline}>
+            <For each={props.phases}>
+              {(phase) => (
+                <li style={timelineItem}>
+                  <span style={iconStyle(phase.status)}>{iconFor(phase.status)}</span>
+                  <span style={phaseLabelStyle(phase.status)}>{phase.shortLabel}</span>
                 </li>
               )}
             </For>
           </ol>
-        </Section>
-      </Show>
+        </Show>
 
-      <Show when={props.phases.length > 0}>
-        <ol style={timeline}>
-          <For each={props.phases}>
-            {(phase) => (
-              <li style={timelineItem}>
-                <span style={iconStyle(phase.status)}>{iconFor(phase.status)}</span>
-                <span style={phaseLabelStyle(phase.status)}>{phase.label}</span>
-              </li>
-            )}
-          </For>
-        </ol>
-      </Show>
-
-      <button onClick={props.onCancel} style={cancelBtn}>Cancel</button>
+        <button onClick={props.onCancel} style={cancelBtn}>Cancel</button>
+      </div>
     </div>
   );
 }
@@ -123,6 +180,10 @@ function Counter(p: { label: string; value: string }) {
       <div style={counterLabel}>{p.label}</div>
     </div>
   );
+}
+
+function Divider() {
+  return <div style={counterDivider} />;
 }
 
 function Section(p: { title: string; children: any }) {
@@ -139,6 +200,19 @@ function folderIconSvg() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function trashIconSvg() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" />
+      <line x1="14" y1="11" x2="14" y2="17" />
     </svg>
   );
 }
@@ -166,33 +240,57 @@ function formatElapsed(ms: number): string {
   return `${m}m ${rs}s`;
 }
 
+// ─────────────────────────── styles ───────────────────────────
+
 const wrap = {
   flex: 1,
   display: "flex",
   "flex-direction": "column",
   "align-items": "center",
   "justify-content": "flex-start",
-  gap: "12px",
-  padding: "32px 32px 24px",
+  padding: "32px 24px 24px",
   "overflow-y": "auto",
-  "max-width": "100%",
 } as const;
 
-const topRow = {
+// Single content column. Every section locks to COL_WIDTH so the eye has one
+// vertical rail.
+const column = {
+  width: `${COL_WIDTH}px`,
+  "max-width": "100%",
+  display: "flex",
+  "flex-direction": "column",
+  gap: "20px",
+} as const;
+
+const headerCard = {
   display: "flex",
   "align-items": "center",
-  gap: "8px",
-  "margin-top": "8px",
+  gap: "20px",
+  padding: "20px 24px",
+  border: "1px solid #1a1a22",
+  "border-radius": "12px",
+  background: "#0d0d12",
 } as const;
-const topRowText = {
+
+const ringWrap = {
+  width: "56px",
+  height: "56px",
+  flex: "0 0 56px",
+  position: "relative",
+} as const;
+
+const headerText = {
   display: "flex",
   "flex-direction": "column",
   "align-items": "flex-start",
   gap: "2px",
+  "min-width": "0",
+  flex: 1,
 } as const;
 
 const title = {
   margin: 0,
+  "font-size": "20px",
   "font-weight": 600,
   "letter-spacing": "-0.5px",
 } as const;
@@ -202,8 +300,8 @@ const pathStyle = {
   color: "#9ca3af",
   "font-size": "13px",
   "font-family": "SF Mono, monospace",
-  "max-width": "640px",
   "overflow-wrap": "anywhere",
+  width: "100%",
 } as const;
 
 const phaseStyle = {
@@ -215,10 +313,12 @@ const phaseStyle = {
 
 const countersRow = {
   display: "flex",
-  gap: "32px",
-  "padding": "16px 24px",
-  "border": "1px solid #1a1a22",
-  "border-radius": "10px",
+  "align-items": "stretch",
+  "justify-content": "space-around",
+  gap: "8px",
+  padding: "20px 24px",
+  border: "1px solid #1a1a22",
+  "border-radius": "12px",
   background: "#0d0d12",
 } as const;
 
@@ -226,11 +326,18 @@ const counterCell = {
   display: "flex",
   "flex-direction": "column",
   "align-items": "center",
-  "min-width": "90px",
+  flex: 1,
+  "min-width": "0",
+} as const;
+
+const counterDivider = {
+  width: "1px",
+  background: "#1a1a22",
+  "align-self": "stretch",
 } as const;
 
 const counterValue = {
-  "font-size": "22px",
+  "font-size": "24px",
   "font-weight": 600,
   "letter-spacing": "-0.5px",
   color: "#f5f5f7",
@@ -242,12 +349,11 @@ const counterLabel = {
   "text-transform": "uppercase",
   "letter-spacing": "1px",
   color: "#6b7280",
-  "margin-top": "4px",
+  "margin-top": "6px",
 } as const;
 
 const section = {
   width: "100%",
-  "max-width": "780px",
   display: "flex",
   "flex-direction": "column",
   gap: "8px",
@@ -270,16 +376,18 @@ const fileList = {
   "border-radius": "8px",
   display: "flex",
   "flex-direction": "column",
-  gap: "4px",
+  gap: "2px",
 } as const;
 
 const fileRow = {
-  display: "flex",
-  "justify-content": "space-between",
-  gap: "16px",
+  display: "grid",
+  "grid-template-columns": "1fr auto auto",
+  "align-items": "center",
+  "column-gap": "12px",
   "font-size": "12px",
   "font-family": "SF Mono, monospace",
-  "padding": "4px 6px",
+  padding: "5px 6px",
+  "border-radius": "5px",
 } as const;
 
 const fileName = {
@@ -288,18 +396,23 @@ const fileName = {
   "text-overflow": "ellipsis",
   "white-space": "nowrap",
   "min-width": "0",
-  flex: 1,
 } as const;
 
 const fileSize = {
   color: "#60a5fa",
   "font-variant-numeric": "tabular-nums",
   "white-space": "nowrap",
-  "min-width": "60px",
+  "min-width": "64px",
   "text-align": "right",
 } as const;
 
-const revealBtn = {
+const rowActions = {
+  display: "flex",
+  "align-items": "center",
+  gap: "4px",
+} as const;
+
+const iconBtn = {
   background: "transparent",
   border: "1px solid #2a2a32",
   color: "#9ca3af",
@@ -313,16 +426,24 @@ const revealBtn = {
   padding: 0,
 } as const;
 
+const iconBtnDanger = {
+  ...iconBtn,
+  color: "#f87171",
+  "border-color": "#3a2424",
+} as const;
+
 const timeline = {
   "list-style": "none",
-  margin: "8px 0 0",
-  padding: 0,
+  margin: 0,
+  padding: "12px 16px",
+  background: "#0d0d12",
+  border: "1px solid #1a1a22",
+  "border-radius": "10px",
   display: "flex",
   "flex-direction": "row",
-  "flex-wrap": "wrap",
-  gap: "16px",
-  "justify-content": "center",
-  "max-width": "780px",
+  "justify-content": "space-between",
+  "align-items": "center",
+  gap: "8px",
 } as const;
 
 const timelineItem = {
@@ -331,6 +452,8 @@ const timelineItem = {
   gap: "6px",
   "font-size": "11px",
   "font-family": "SF Mono, monospace",
+  flex: 1,
+  "justify-content": "center",
 } as const;
 
 function iconStyle(s: PhaseStatus) {
@@ -350,11 +473,12 @@ function phaseLabelStyle(s: PhaseStatus) {
 }
 
 const cancelBtn = {
-  "margin-top": "8px",
+  "align-self": "center",
+  "margin-top": "4px",
   background: "transparent",
   border: "1px solid #2a2a32",
   color: "#9ca3af",
-  padding: "6px 16px",
+  padding: "6px 20px",
   "border-radius": "6px",
   "font-size": "12px",
   cursor: "pointer",

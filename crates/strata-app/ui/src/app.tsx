@@ -21,11 +21,11 @@ import { APP_VERSION } from "./version";
 
 // Phase timeline shown during a scan. Order matches the scan engine.
 const INITIAL_PHASES: PhaseEntry[] = [
-  { id: "walk", label: "Walking filesystem", status: "pending" },
-  { id: "tm", label: "Time Machine status", status: "pending" },
-  { id: "icloud", label: "iCloud detection", status: "pending" },
-  { id: "spotlight", label: "Spotlight metadata", status: "pending" },
-  { id: "hash", label: "Duplicate detection", status: "pending" },
+  { id: "walk", label: "Walking filesystem", shortLabel: "Walk", status: "pending" },
+  { id: "tm", label: "Time Machine status", shortLabel: "TM", status: "pending" },
+  { id: "icloud", label: "iCloud detection", shortLabel: "iCloud", status: "pending" },
+  { id: "spotlight", label: "Spotlight metadata", shortLabel: "Spotlight", status: "pending" },
+  { id: "hash", label: "Duplicate detection", shortLabel: "Dupes", status: "pending" },
 ];
 
 function setPhase(phases: PhaseEntry[], id: string, status: PhaseStatus): PhaseEntry[] {
