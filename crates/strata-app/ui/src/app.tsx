@@ -162,7 +162,7 @@ export default function App() {
     })();
   });
 
-  async function scanPath(p: string) {
+  async function scanPath(p: string, seedSnapshot?: ScanSnapshot) {
     if (scanning()) return;
     setLastScannedPath(p);
     setTree(null);
@@ -171,7 +171,9 @@ export default function App() {
     setCounters({ dirs: 0, files: 0, bytes: 0, startedAt: Date.now() });
     setPhases(INITIAL_PHASES);
     setElapsedMs(0);
-    setSnapshot(null);
+    // Seed with the persisted snapshot if available so the user sees their
+    // previous treemap + files instantly, before live data starts arriving.
+    setSnapshot(seedSnapshot ?? null);
     sel.select(null);
     await startScan(p);
   }
@@ -213,7 +215,16 @@ export default function App() {
           <Sidebar tree={tree()} visible={sidebarOpen()} onPick={handlePick} />
           <main style={{ flex: 1, display: "flex", "flex-direction": "column", "min-width": 0 }}>
             <Show when={!tree() && !scanning()}>
-              <QuickPicker onPick={(p) => { void scanPath(p); }} onCustom={handlePick} />
+              <QuickPicker
+                onPick={(p) => { void scanPath(p); }}
+                onCustom={handlePick}
+                onResume={(snap) => {
+                  void scanPath(snap.source_path, {
+                    topDirs: snap.top_dirs,
+                    biggestFiles: snap.biggest_files,
+                  });
+                }}
+              />
             </Show>
             <Show when={scanning() && !tree()}>
               <ScanningState

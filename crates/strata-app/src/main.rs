@@ -3,6 +3,7 @@
 mod commands;
 mod fs_watcher;
 mod permissions;
+mod persist;
 mod scan_runner;
 mod volumes;
 
@@ -47,6 +48,8 @@ fn main() {
             commands::check_full_disk_access,
             commands::open_fda_settings,
             commands::home_dir,
+            commands::load_last_snapshot,
+            commands::clear_last_snapshot,
             fs_watcher::start_watching,
             fs_watcher::stop_watching,
         ])

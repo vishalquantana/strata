@@ -1,6 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { ProgressEvent, ScanTree, Volume } from "./types";
+import type { BigFile, ProgressEvent, ScanTree, TopDir, Volume } from "./types";
+
+export interface PersistedSnapshot {
+  source_path: string;
+  captured_at: number; // unix epoch seconds
+  is_complete: boolean;
+  top_dirs: TopDir[];
+  biggest_files: BigFile[];
+}
+
+export async function loadLastSnapshot(): Promise<PersistedSnapshot | null> {
+  const r = await invoke<PersistedSnapshot | null>("load_last_snapshot");
+  return r ?? null;
+}
+
+export async function clearLastSnapshot(): Promise<void> {
+  await invoke("clear_last_snapshot");
+}
 
 export async function pickDirectory(): Promise<string | null> {
   const r = await invoke<string | null>("pick_directory");

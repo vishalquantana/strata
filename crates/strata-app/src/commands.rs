@@ -6,6 +6,7 @@ use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
 use crate::permissions::{check as check_fda, FdaStatus};
+use crate::persist::{self, PersistedSnapshot};
 use crate::scan_runner;
 use crate::volumes::{list_volumes as list_volumes_impl, Volume};
 
@@ -67,6 +68,22 @@ pub fn check_full_disk_access() -> FdaStatus {
 #[tauri::command]
 pub fn home_dir() -> Result<String, String> {
     std::env::var("HOME").map_err(|e| format!("HOME not set: {e}"))
+}
+
+/// Read the last persisted snapshot from disk so the welcome screen can
+/// offer a "Resume last view" card on cold start. Returns `None` if no
+/// previous scan ran or the file is missing/corrupt.
+#[tauri::command]
+pub fn load_last_snapshot() -> Option<PersistedSnapshot> {
+    persist::load()
+}
+
+/// Delete the persisted snapshot. Called when the user dismisses the resume
+/// card or starts a fresh scan they don't want to roll back to.
+#[tauri::command]
+pub fn clear_last_snapshot() -> Result<(), String> {
+    persist::clear();
+    Ok(())
 }
 
 #[tauri::command]

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-04-27
+
+### Added
+- **Persisted last-scan snapshot.** Every WalkSnapshot tick is now also
+  written to `~/Library/Application Support/Strata/last-scan.json` (path
+  + UTC timestamp + top dirs + biggest files + completion flag). When a
+  scan finishes the flag flips to `is_complete: true`.
+- **Resume card on welcome screen.** If a previous snapshot exists, the
+  welcome screen now shows a "Resume last view" card at the top with the
+  scanned path, counts, and "{N} {unit} ago" timestamp. Click **Open** to
+  jump straight back into the scanning view pre-seeded with the saved
+  treemap + biggest-files (so the user sees their old data instantly), and
+  a fresh scan kicks off underneath to refresh it. Click **×** to dismiss
+  and clear the saved snapshot.
+- New Tauri commands: `load_last_snapshot`, `clear_last_snapshot`.
+
 ## [0.3.6] - 2026-04-27
 
 ### Changed
@@ -190,7 +206,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drill-down / zoom-out via click and breadcrumb
 - Volume listing via `sysinfo`
 
-[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.6...HEAD
+[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.7...HEAD
+[0.3.7]: https://github.com/vishalquantana/strata/releases/tag/v0.3.7
 [0.3.6]: https://github.com/vishalquantana/strata/releases/tag/v0.3.6
 [0.3.5]: https://github.com/vishalquantana/strata/releases/tag/v0.3.5
 [0.3.4]: https://github.com/vishalquantana/strata/releases/tag/v0.3.4
