@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = ["crates/strata-scan"]
+
+[workspace.package]
+edition = "2021"
+authors = ["Vishal Kumar"]
+license = "MIT"
+repository = "https://github.com/vishalquantana/strata"
