@@ -9,6 +9,7 @@ mod volumes;
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(fs_watcher::WatcherState::default())
         .invoke_handler(tauri::generate_handler![
             commands::pick_directory,
             commands::start_scan,
