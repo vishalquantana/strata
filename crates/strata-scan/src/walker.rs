@@ -7,8 +7,9 @@
 //! mtime, ctime, and the junk-pattern flag. Spotlight, Time Machine, iCloud,
 //! and hashing are all separate later passes.
 
+use crate::icloud::{detect_cloud_provider, is_file_dehydrated};
 use crate::junk::is_known_junk;
-use crate::model::{DirNode, NodeId, ScanTree, Signals};
+use crate::model::{CloudProvider, DirNode, NodeId, ScanTree, Signals};
 use crate::progress::{BigFile, ProgressEvent, TopDir};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -118,11 +119,16 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
     let mut depth1_ancestor: HashMap<NodeId, NodeId> = HashMap::new();
     // Running size totals keyed by depth-1 NodeId.
     let mut top_dir_sizes: HashMap<NodeId, u64> = HashMap::new();
-    // Min-heap of (size, path, name) capped at SNAPSHOT_TOP_FILES so we always
-    // have the largest files seen so far. Reverse<u64> makes it a min-heap.
-    let mut biggest_files_heap: BinaryHeap<Reverse<(u64, String, String)>> = BinaryHeap::new();
+    // Min-heap of (size, path, name, cloud_provider, is_dehydrated) capped at
+    // SNAPSHOT_TOP_FILES so we always have the largest files seen so far.
+    // Reverse<u64> at position 0 makes it a min-heap on size.
+    let mut biggest_files_heap: BinaryHeap<
+        Reverse<(u64, String, String, Option<CloudProvider>, bool)>,
+    > = BinaryHeap::new();
     let mut last_snapshot_emit = Instant::now();
     let mut first_snapshot_sent = false;
+    // Cache home dir once for path-based provider detection in the hot loop.
+    let home_dir = std::env::var("HOME").unwrap_or_default();
 
     // Single-threaded enumeration of directories (jwalk gives parallelism for
     // descent but we want deterministic order while assigning ids).
@@ -170,7 +176,16 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
                 Some(id) => *id,
                 None => continue, // file under a dir we haven't registered (unlikely with sorted walk)
             };
-            let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+            let file_meta = entry.metadata().ok();
+            let size = file_meta.as_ref().map(|m| m.len()).unwrap_or(0);
+            let blocks = file_meta.as_ref().map(|m| m.blocks()).unwrap_or(0);
+
+            // Cloud-provider + dehydration detection. Path-only and st_blocks-only,
+            // both already resident in the metadata we just fetched, so this adds
+            // ~no cost to the hot loop.
+            let file_path_for_detect = entry.path().to_string_lossy().to_string();
+            let cloud_provider = detect_cloud_provider(&home_dir, &file_path_for_detect);
+            let is_dehydrated = is_file_dehydrated(blocks, size);
 
             // Always increment the file count on the parent.
             nodes[parent_id as usize].file_count += 1;
@@ -178,7 +193,7 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
             // Capture file mtime for both parent rollup and (if promoted) the
             // file leaf node itself.
             let file_mtime: Option<DateTime<Utc>> =
-                entry.metadata().ok().and_then(|m| m.modified().ok()).map(DateTime::<Utc>::from);
+                file_meta.as_ref().and_then(|m| m.modified().ok()).map(DateTime::<Utc>::from);
 
             // Roll mtime up onto the parent.
             if let Some(mt) = file_mtime {
@@ -192,7 +207,7 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
             // it to a leaf node. Otherwise tally its bytes into the parent
             // dir's "small files lump" so the dir's total still adds up.
             if size >= FILE_NODE_MIN_BYTES {
-                let file_path_str = entry.path().to_string_lossy().to_string();
+                let file_path_str = file_path_for_detect.clone();
                 let file_name = entry
                     .path()
                     .file_name()
@@ -205,9 +220,11 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
                     last_modified_at: file_mtime.unwrap_or_else(epoch),
                     created_at: file_mtime.unwrap_or_else(epoch),
                     is_backed_up_tm: false,
-                    is_in_icloud: false,
+                    is_in_icloud: cloud_provider == Some(CloudProvider::ICloud),
                     is_known_junk: is_known_junk(entry.path().as_ref()),
                     duplicate_group_id: None,
+                    cloud_provider,
+                    is_dehydrated,
                 };
                 let leaf = DirNode {
                     id,
@@ -248,18 +265,25 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
 
             // Track biggest files (only ≥ SNAPSHOT_FILE_MIN_BYTES to skip churn).
             if size >= SNAPSHOT_FILE_MIN_BYTES {
-                let path_str = entry.path().to_string_lossy().to_string();
+                let path_str = file_path_for_detect.clone();
                 let name = entry
                     .path()
                     .file_name()
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_else(|| path_str.clone());
                 if biggest_files_heap.len() < SNAPSHOT_TOP_FILES {
-                    biggest_files_heap.push(Reverse((size, path_str, name)));
-                } else if let Some(Reverse((min_size, _, _))) = biggest_files_heap.peek() {
+                    biggest_files_heap
+                        .push(Reverse((size, path_str, name, cloud_provider, is_dehydrated)));
+                } else if let Some(Reverse((min_size, _, _, _, _))) = biggest_files_heap.peek() {
                     if size > *min_size {
                         biggest_files_heap.pop();
-                        biggest_files_heap.push(Reverse((size, path_str, name)));
+                        biggest_files_heap.push(Reverse((
+                            size,
+                            path_str,
+                            name,
+                            cloud_provider,
+                            is_dehydrated,
+                        )));
                     }
                 }
             }
@@ -324,14 +348,17 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
             })
             .unwrap_or_else(|| (epoch(), epoch()));
 
+        let dir_provider = detect_cloud_provider(&home_dir, &path_str);
         let signals = Signals {
             last_used_at: None,
             last_modified_at: modified_at,
             created_at,
             is_backed_up_tm: false,
-            is_in_icloud: false,
+            is_in_icloud: dir_provider == Some(CloudProvider::ICloud),
             is_known_junk: is_known_junk(&path),
             duplicate_group_id: None,
+            cloud_provider: dir_provider,
+            is_dehydrated: false,
         };
 
         let node = DirNode {
@@ -439,7 +466,9 @@ fn emit_snapshot(
     progress_cb: &mut impl FnMut(&ProgressEvent),
     nodes: &[DirNode],
     top_dir_sizes: &HashMap<NodeId, u64>,
-    biggest_files_heap: &BinaryHeap<Reverse<(u64, String, String)>>,
+    biggest_files_heap: &BinaryHeap<
+        Reverse<(u64, String, String, Option<CloudProvider>, bool)>,
+    >,
 ) {
     // Top-level dirs sorted by running size desc.
     let mut top_dirs: Vec<TopDir> = top_dir_sizes
@@ -460,10 +489,12 @@ fn emit_snapshot(
     // collect and sort.
     let mut biggest_files: Vec<BigFile> = biggest_files_heap
         .iter()
-        .map(|Reverse((sz, path, name))| BigFile {
+        .map(|Reverse((sz, path, name, prov, dehydrated))| BigFile {
             path: path.clone(),
             name: name.clone(),
             size_bytes: *sz,
+            cloud_provider: *prov,
+            is_dehydrated: *dehydrated,
         })
         .collect();
     biggest_files.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));

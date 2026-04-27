@@ -2,6 +2,9 @@ export type NodeId = number;
 
 export type Stale = "hot" | "warm" | "stale" | "verystale";
 
+/// Cloud-storage provider syncing a file/dir, mirrored from the Rust enum.
+export type CloudProvider = "icloud" | "googledrive" | "onedrive" | "dropbox" | "box";
+
 export interface Signals {
   last_used_at: string | null;
   last_modified_at: string;
@@ -10,6 +13,8 @@ export interface Signals {
   is_in_icloud: boolean;
   is_known_junk: boolean;
   duplicate_group_id: number | null;
+  cloud_provider?: CloudProvider | null;
+  is_dehydrated?: boolean;
 }
 
 export interface DirNode {
@@ -46,6 +51,8 @@ export interface BigFile {
   path: string;
   name: string;
   size_bytes: number;
+  cloud_provider?: CloudProvider | null;
+  is_dehydrated?: boolean;
 }
 
 export interface TopDir {

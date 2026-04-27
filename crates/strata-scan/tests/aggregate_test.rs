@@ -15,6 +15,7 @@ fn dummy_tree() -> ScanTree {
             file_count: 0,
             signals: Signals::default(),
             children: vec![1, 2],
+            is_file: false,
         },
         DirNode {
             id: 1,
@@ -26,6 +27,7 @@ fn dummy_tree() -> ScanTree {
             file_count: 0,
             signals: Signals::default(),
             children: vec![],
+            is_file: false,
         },
         DirNode {
             id: 2,
@@ -37,6 +39,7 @@ fn dummy_tree() -> ScanTree {
             file_count: 0,
             signals: Signals::default(),
             children: vec![],
+            is_file: false,
         },
     ];
     ScanTree {

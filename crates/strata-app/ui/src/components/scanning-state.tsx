@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import type { BigFile, ProgressEvent, TopDir } from "../types";
 import { moveToTrash, revealInFinder } from "../ipc";
+import CloudBadge from "./cloud-badge";
 import SnapshotTreemap from "./snapshot-treemap";
 
 export interface ScanCounters {
@@ -47,6 +48,12 @@ export default function ScanningState(props: Props) {
   // snapshots too (path-prefix match).
   const [deleted, setDeleted] = createSignal<string[]>([]);
 
+  // Cloud-synced files (iCloud / Google Drive / OneDrive / Dropbox / Box)
+  // are hidden by default — trashing them is rarely useful for local-disk
+  // cleanup and dehydrated copies take ~0 B locally anyway. The user can
+  // toggle them back into view with the chip near the section title.
+  const [showCloud, setShowCloud] = createSignal(false);
+
   // The treemap renderer needs an explicit pixel width. Measure the
   // container with ResizeObserver so the map stays responsive when the
   // window is resized (or sidebar toggled).
@@ -77,9 +84,18 @@ export default function ScanningState(props: Props) {
     return dirs.filter((d) => !isDeleted(d.path));
   });
 
+  // Files that match the deleted/cloud filters are dropped from the
+  // visible list. We split into two memos so the section title can show
+  // "(N hidden cloud files — show)" without recomputing the heavy filter.
+  const undeletedFiles = createMemo(() =>
+    (props.snapshot?.biggestFiles ?? []).filter((f) => !isDeleted(f.path)),
+  );
+  const cloudFiles = createMemo(() =>
+    undeletedFiles().filter((f) => f.cloud_provider != null),
+  );
   const visibleFiles = createMemo(() => {
-    const files = props.snapshot?.biggestFiles ?? [];
-    return files.filter((f) => !isDeleted(f.path));
+    if (showCloud()) return undeletedFiles();
+    return undeletedFiles().filter((f) => f.cloud_provider == null);
   });
 
   const handleTrash = async (path: string) => {
@@ -148,8 +164,25 @@ export default function ScanningState(props: Props) {
 
           {/* Right: biggest-files list */}
           <div style={rightCol}>
-            <div style={sectionTitle}>
-              Biggest files found ({visibleFiles().length})
+            <div style={sectionTitleRow}>
+              <div style={sectionTitle}>
+                Biggest files found ({visibleFiles().length})
+              </div>
+              <Show when={cloudFiles().length > 0}>
+                <button
+                  onClick={() => setShowCloud((v) => !v)}
+                  style={cloudToggle(showCloud())}
+                  title={
+                    showCloud()
+                      ? "Hide files synced from iCloud / Google Drive / OneDrive / Dropbox"
+                      : "Show files synced from iCloud / Google Drive / OneDrive / Dropbox"
+                  }
+                >
+                  {showCloud()
+                    ? `Hide cloud (${cloudFiles().length})`
+                    : `Show cloud (${cloudFiles().length})`}
+                </button>
+              </Show>
             </div>
             <Show
               when={visibleFiles().length > 0}
@@ -166,6 +199,10 @@ export default function ScanningState(props: Props) {
                         void revealInFinder(f.path);
                       }}
                     >
+                      <CloudBadge
+                        provider={f.cloud_provider ?? null}
+                        dehydrated={f.is_dehydrated}
+                      />
                       <span style={fileName}>{f.name}</span>
                       <span style={fileSize}>{formatBytes(f.size_bytes)}</span>
                       <div style={rowActions}>
@@ -433,6 +470,30 @@ const sectionTitle = {
   "padding-left": "2px",
 } as const;
 
+const sectionTitleRow = {
+  display: "flex",
+  "align-items": "center",
+  "justify-content": "space-between",
+  gap: "8px",
+  "padding-bottom": "6px",
+} as const;
+
+function cloudToggle(active: boolean): Record<string, string> {
+  return {
+    "font-size": "10px",
+    "text-transform": "uppercase",
+    "letter-spacing": "1px",
+    "font-weight": "600",
+    padding: "3px 8px",
+    "border-radius": "100px",
+    background: active ? "#1d4ed8" : "transparent",
+    color: active ? "#ffffff" : "#9ca3af",
+    border: active ? "1px solid #1d4ed8" : "1px solid #1a1a22",
+    cursor: "pointer",
+    "white-space": "nowrap",
+  };
+}
+
 const fileList = {
   "list-style": "none",
   margin: 0,
@@ -452,9 +513,10 @@ const fileList = {
 
 const fileRow = {
   display: "grid",
-  "grid-template-columns": "1fr auto auto",
+  // [badge] [name] [size] [actions]
+  "grid-template-columns": "auto 1fr auto auto",
   "align-items": "center",
-  "column-gap": "12px",
+  "column-gap": "10px",
   "font-size": "12px",
   "font-family": "SF Mono, monospace",
   padding: "5px 6px",

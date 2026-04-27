@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.9] - 2026-04-27
+
+### Added
+- **Cloud-storage detection per file.** The walker now tags every file with
+  the cloud provider syncing it (iCloud / Google Drive / OneDrive / Dropbox /
+  Box) using path-prefix lookup against the standard sync roots
+  (`~/Library/Mobile Documents/com~apple~CloudDocs/`,
+  `~/Library/CloudStorage/<Provider>-...`, plus legacy `~/Google Drive`,
+  `~/Dropbox`, `~/OneDrive`).
+- **Dehydrated-file detection.** Files where `st_blocks * 512` is well below
+  `st_size` are flagged as `is_dehydrated` — these are dataless placeholders
+  (cloud-only / "Optimize Storage") that take ~0 B of local disk.
+- **Cloud badge on biggest-files rows.** Every row now leads with a 22 px
+  square badge: filled brand colour for materialised cloud files, dashed
+  outline for dehydrated, faint grey dot for local. Tooltip names the
+  provider and tells you whether the file is local or cloud-only.
+
+### Changed
+- **Cloud files hidden by default during scan.** Files synced from any cloud
+  provider are filtered out of the live "Biggest files found" list — trashing
+  them is rarely useful for local-disk cleanup. A new chip beside the
+  section title ("Show cloud (N)" / "Hide cloud (N)") toggles them back in.
+- `Signals` gained `cloud_provider: Option<CloudProvider>` and
+  `is_dehydrated: bool`. Both `#[serde(default)]` so older saved snapshots
+  still load. `is_in_icloud` is preserved for backwards-compat.
+- `BigFile` (during-scan snapshot row) gained the same two fields.
+
 ## [0.3.8] - 2026-04-27
 
 ### Added
@@ -224,7 +251,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drill-down / zoom-out via click and breadcrumb
 - Volume listing via `sysinfo`
 
-[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.8...HEAD
+[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.9...HEAD
+[0.3.9]: https://github.com/vishalquantana/strata/releases/tag/v0.3.9
 [0.3.8]: https://github.com/vishalquantana/strata/releases/tag/v0.3.8
 [0.3.7]: https://github.com/vishalquantana/strata/releases/tag/v0.3.7
 [0.3.6]: https://github.com/vishalquantana/strata/releases/tag/v0.3.6

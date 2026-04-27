@@ -19,6 +19,7 @@ fn renders_tree_as_json() {
             file_count: 1,
             signals: Signals::default(),
             children: vec![],
+            is_file: false,
         }],
     };
     let s = render_tree_json(&tree).unwrap();

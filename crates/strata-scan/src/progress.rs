@@ -3,6 +3,7 @@
 //! Events are emitted by the orchestrator during scanning and consumed
 //! either as JSON Lines on stdout (CLI mode) or via channel send (Tauri mode).
 
+use crate::model::CloudProvider;
 use serde::{Deserialize, Serialize};
 
 /// One of the largest files discovered so far. Emitted as part of `WalkSnapshot`.
@@ -11,6 +12,15 @@ pub struct BigFile {
     pub path: String,
     pub name: String,
     pub size_bytes: u64,
+    /// Cloud provider syncing this file (iCloud / Google Drive / OneDrive /
+    /// Dropbox / Box) or None if local-only. `#[serde(default)]` so older
+    /// snapshot consumers ignore the field.
+    #[serde(default)]
+    pub cloud_provider: Option<CloudProvider>,
+    /// True iff this file is a dataless placeholder (allocated blocks far
+    /// below logical size — typical of cloud-only / "Optimize Storage" files).
+    #[serde(default)]
+    pub is_dehydrated: bool,
 }
 
 /// Running size of a top-level (depth-1) directory under the scan root.

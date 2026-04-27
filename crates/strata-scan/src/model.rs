@@ -21,6 +21,19 @@ pub enum Stale {
     VeryStale, // > 2 years
 }
 
+/// Cloud-storage provider syncing this path. Detected via path-prefix during
+/// the walk; macOS 12.3+ unifies third-party providers under
+/// `~/Library/CloudStorage/<Provider>-...`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CloudProvider {
+    ICloud,
+    GoogleDrive,
+    OneDrive,
+    Dropbox,
+    Box,
+}
+
 /// All six signals collected for a directory.
 /// Defaults represent "unknown" / "not yet computed".
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -45,6 +58,15 @@ pub struct Signals {
     pub is_known_junk: bool,
     /// Set during phase-2 hashing. None until hashing pass completes for this node.
     pub duplicate_group_id: Option<u64>,
+    /// Cloud provider syncing this path, or None if not under any known
+    /// sync root. Set during the walk via path-prefix lookup.
+    #[serde(default)]
+    pub cloud_provider: Option<CloudProvider>,
+    /// True iff the file's allocated blocks are far below its logical size
+    /// — i.e. the file is a dataless placeholder and downloads on demand.
+    /// Computed from `st_blocks` vs `st_size` during the walk for file leaves.
+    #[serde(default)]
+    pub is_dehydrated: bool,
 }
 
 fn epoch_now() -> DateTime<Utc> {
