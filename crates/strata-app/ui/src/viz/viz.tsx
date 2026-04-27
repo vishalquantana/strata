@@ -8,6 +8,7 @@ import { render, type Shape } from "./render";
 import { hitTestRects, hitTestArcs } from "./hit-test";
 import { buildMorphShapes, easeInOutCubic } from "./morph";
 import Toggle, { type VizMode } from "../components/toggle";
+import HoverPeek from "../components/hover-peek";
 import { makeMatcher } from "../stores/filters";
 import { selectionStore } from "../stores/selection";
 
@@ -22,6 +23,7 @@ const MORPH_DURATION_MS = 600;
 export default function Viz(props: Props) {
   let canvasRef: HTMLCanvasElement | undefined;
   const [hoveredId, setHoveredId] = createSignal<number | null>(null);
+  const [cursor, setCursor] = createSignal<{ x: number; y: number } | null>(null);
   const [zoomRoot, setZoomRoot] = createSignal<number>(props.initialRootId);
   const [mode, setMode] = createSignal<VizMode>("treemap");
   const matcher = makeMatcher();
@@ -143,6 +145,7 @@ export default function Viz(props: Props) {
     const y = e.clientY - r.top;
     const id = mode() === "treemap" ? hitTestRects(rects, x, y) : hitTestArcs(arcs, x, y);
     setHoveredId(id);
+    setCursor({ x: e.clientX, y: e.clientY });
   }
 
   function onClick() {
@@ -168,13 +171,20 @@ export default function Viz(props: Props) {
       <canvas
         ref={canvasRef}
         onMouseMove={onMove}
-        onMouseLeave={() => setHoveredId(null)}
+        onMouseLeave={() => { setHoveredId(null); setCursor(null); }}
         onClick={onClick}
         style={{ width: "100%", height: "100%", display: "block", cursor: "pointer" }}
       />
       <Toggle mode={mode()} onChange={startMorph} />
       {zoomRoot() !== props.tree.root_id && (
         <button onClick={zoomOut} style={zoomBtn}>← Back</button>
+      )}
+      {hoveredId() !== null && cursor() && (
+        <HoverPeek
+          node={nodesById.get(hoveredId()!) ?? null}
+          x={cursor()!.x}
+          y={cursor()!.y}
+        />
       )}
     </div>
   );
