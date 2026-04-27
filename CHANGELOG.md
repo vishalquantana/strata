@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-04-27
+
+### Added
+- **Live treemap during scan.** The "Top folders so far" section is now a
+  proper 2D squarified D3 treemap (not a horizontal stripe), so each
+  top-level folder is a rectangle proportional to its running size. Click
+  or right-click a tile to reveal it in Finder.
+- **Faster first paint.** First scan snapshot now fires after ~5 s; later
+  snapshots every 30 s, so the user sees a treemap quickly without paying
+  for frequent recomputation.
+
+### Changed
+- Scan snapshot cadence: 5 s → 30 s (after the first one), reducing UI
+  reflow during long scans.
+- Replaced the colored horizontal proportional bar with the 2D treemap.
+
 ## [0.3.1] - 2026-04-27
 
 ### Added
@@ -112,7 +128,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drill-down / zoom-out via click and breadcrumb
 - Volume listing via `sysinfo`
 
-[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/vishalquantana/strata/releases/tag/v0.3.2
 [0.3.1]: https://github.com/vishalquantana/strata/releases/tag/v0.3.1
 [0.3.0]: https://github.com/vishalquantana/strata/releases/tag/v0.3.0
 [0.2.2]: https://github.com/vishalquantana/strata/releases/tag/v0.2.2

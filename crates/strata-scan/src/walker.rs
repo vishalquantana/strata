@@ -25,8 +25,12 @@ const THROTTLE_INTERVAL: Duration = Duration::from_millis(250);
 /// On tiny/fast scans the final flush is sufficient; this gate suppresses
 /// spurious mid-walk events.
 const THROTTLE_MIN_NODES: u64 = 1000;
-/// How often to emit a mid-walk `WalkSnapshot` event during Pass 2.
-const SNAPSHOT_INTERVAL: Duration = Duration::from_secs(5);
+/// How often to emit a mid-walk `WalkSnapshot` event during Pass 2 after the
+/// first one has been sent.
+const SNAPSHOT_INTERVAL: Duration = Duration::from_secs(30);
+/// Delay before the very first snapshot, so the UI shows a treemap quickly
+/// rather than waiting a full SNAPSHOT_INTERVAL.
+const SNAPSHOT_FIRST_DELAY: Duration = Duration::from_secs(5);
 /// How many biggest files to track and report in each snapshot.
 const SNAPSHOT_TOP_FILES: usize = 30;
 /// How many top-level directories to report in each snapshot.
@@ -249,6 +253,7 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
     // have the largest files seen so far. Reverse<u64> makes it a min-heap.
     let mut biggest_files_heap: BinaryHeap<Reverse<(u64, String, String)>> = BinaryHeap::new();
     let mut last_snapshot_emit = Instant::now();
+    let mut first_snapshot_sent = false;
 
     // Second pass: tally file sizes & counts INTO the immediate parent dir.
     // We accumulate from leaves up by sorting by depth descending, but for
@@ -344,10 +349,18 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
             }
         }
 
-        // Periodic snapshot emit.
-        if last_snapshot_emit.elapsed() >= SNAPSHOT_INTERVAL {
+        // Periodic snapshot emit. First one fires after SNAPSHOT_FIRST_DELAY
+        // so the user sees a treemap quickly; subsequent ones use the
+        // (longer) SNAPSHOT_INTERVAL.
+        let due_at = if first_snapshot_sent {
+            SNAPSHOT_INTERVAL
+        } else {
+            SNAPSHOT_FIRST_DELAY
+        };
+        if last_snapshot_emit.elapsed() >= due_at {
             emit_snapshot(progress_cb, &nodes, &top_dir_sizes, &biggest_files_heap);
             last_snapshot_emit = Instant::now();
+            first_snapshot_sent = true;
         }
     }
 

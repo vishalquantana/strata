@@ -1,6 +1,7 @@
 import { For, Show } from "solid-js";
 import type { BigFile, ProgressEvent, TopDir } from "../types";
 import { revealInFinder } from "../ipc";
+import SnapshotTreemap from "./snapshot-treemap";
 
 export interface ScanCounters {
   dirs: number;
@@ -33,8 +34,6 @@ interface Props {
 
 export default function ScanningState(props: Props) {
   const currentPhase = () => props.phases.find((p) => p.status === "active");
-  const totalTopDirSize = () =>
-    props.snapshot?.topDirs.reduce((s, d) => s + d.size_bytes, 0) ?? 0;
 
   return (
     <div style={wrap}>
@@ -61,27 +60,11 @@ export default function ScanningState(props: Props) {
 
       <Show when={(props.snapshot?.topDirs.length ?? 0) > 0}>
         <Section title="Top folders so far">
-          <div style={topDirsBar}>
-            <For each={props.snapshot!.topDirs}>
-              {(dir, i) => {
-                const total = totalTopDirSize();
-                const pct = total > 0 ? (dir.size_bytes / total) * 100 : 0;
-                return (
-                  <div
-                    style={{
-                      ...topDirCell,
-                      flex: `${Math.max(pct, 4)} 1 0`,
-                      background: dirColor(i()),
-                    }}
-                    title={`${dir.path} — ${formatBytes(dir.size_bytes)}`}
-                  >
-                    <div style={topDirName}>{dir.name}</div>
-                    <div style={topDirSize}>{formatBytes(dir.size_bytes)}</div>
-                  </div>
-                );
-              }}
-            </For>
-          </div>
+          <SnapshotTreemap
+            topDirs={props.snapshot!.topDirs}
+            width={780}
+            height={260}
+          />
         </Section>
       </Show>
 
@@ -164,16 +147,6 @@ function iconFor(s: PhaseStatus): string {
   if (s === "done") return "✓";
   if (s === "active") return "●";
   return "○";
-}
-
-// Stable hue palette for the top-dirs bar — distinct enough to read at a glance.
-const DIR_COLORS = [
-  "#3b82f6", "#f59e0b", "#10b981", "#ec4899", "#8b5cf6",
-  "#06b6d4", "#f97316", "#84cc16", "#e11d48", "#0ea5e9",
-  "#a855f7", "#14b8a6",
-] as const;
-function dirColor(i: number): string {
-  return DIR_COLORS[i % DIR_COLORS.length];
 }
 
 function formatBytes(b: number): string {
@@ -286,40 +259,6 @@ const sectionTitle = {
   "letter-spacing": "1.2px",
   color: "#6b7280",
   "padding-left": "2px",
-} as const;
-
-const topDirsBar = {
-  display: "flex",
-  height: "60px",
-  "border-radius": "8px",
-  overflow: "hidden",
-  border: "1px solid #1a1a22",
-  background: "#0d0d12",
-} as const;
-
-const topDirCell = {
-  "min-width": "0",
-  padding: "8px 10px",
-  display: "flex",
-  "flex-direction": "column",
-  "justify-content": "space-between",
-  color: "#0d0d12",
-  "font-weight": 600,
-  overflow: "hidden",
-  transition: "flex 400ms ease",
-} as const;
-
-const topDirName = {
-  "font-size": "11px",
-  "white-space": "nowrap",
-  overflow: "hidden",
-  "text-overflow": "ellipsis",
-} as const;
-
-const topDirSize = {
-  "font-size": "10px",
-  opacity: 0.85,
-  "font-variant-numeric": "tabular-nums",
 } as const;
 
 const fileList = {
