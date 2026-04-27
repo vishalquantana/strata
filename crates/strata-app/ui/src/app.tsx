@@ -3,6 +3,8 @@ import {
   pickDirectory, startScan, onScanProgress, onScanComplete, onScanError,
   startWatching,
 } from "./ipc";
+import Onboarding from "./components/onboarding";
+import { checkFullDiskAccess } from "./ipc";
 import type { ProgressEvent, ScanTree } from "./types";
 import Viz from "./viz/viz";
 import ProgressBar from "./components/progress-bar";
@@ -17,6 +19,9 @@ export default function App() {
   const [scanning, setScanning] = createSignal(false);
   const [currentRoot, setCurrentRoot] = createSignal<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = createSignal(true);
+  const [hasFda, setHasFda] = createSignal<boolean>(false);
+  // fdaChecked gates a future loading-spinner; unused for now
+  const [_fdaChecked, setFdaChecked] = createSignal<boolean>(false);
 
   const sel = selectionStore();
   const selectedNode = createMemo(() => {
@@ -27,6 +32,9 @@ export default function App() {
   });
 
   onMount(async () => {
+    const initial = await checkFullDiskAccess();
+    setHasFda(initial === "granted");
+    setFdaChecked(true);
     await onScanProgress((ev) => setEvent(ev));
     await onScanComplete(async (t) => {
       setTree(t);
@@ -51,43 +59,45 @@ export default function App() {
   }
 
   return (
-    <div style={{ height: "100vh", display: "flex", "flex-direction": "column" }}>
-      <header style={header}>
-        <button onClick={() => setSidebarOpen(!sidebarOpen())} style={iconBtn} title="Toggle sidebar">⌘</button>
-        <span style={{ "font-weight": 700, "letter-spacing": "-0.3px" }}>Strata</span>
-        <Show when={tree() && currentRoot() !== null}>
-          <Breadcrumb tree={tree()!} currentId={currentRoot()!} onJumpTo={setCurrentRoot} />
-        </Show>
-        <div style={{ "margin-left": "auto" }}>
-          <ProgressBar event={event()} active={scanning()} />
-        </div>
-      </header>
-      <div style={{ flex: 1, display: "flex", "min-height": 0 }}>
-        <Sidebar tree={tree()} visible={sidebarOpen()} onPick={handlePick} />
-        <main style={{ flex: 1, display: "flex", "flex-direction": "column", "min-width": 0 }}>
-          <Show when={!tree() && !scanning()}>
-            <div style={emptyWrap}>
-              <h2 style={{ margin: "0 0 8px", "font-weight": 600, "letter-spacing": "-0.5px" }}>Welcome to Strata</h2>
-              <p style={{ margin: "0 0 24px", color: "#6b7280", "font-size": "14px" }}>
-                Pick a folder to see what's eating your disk.
-              </p>
-              <button onClick={handlePick} style={btnPrimary}>Choose folder…</button>
-            </div>
-          </Show>
+    <Show when={hasFda()} fallback={<Onboarding onGranted={() => setHasFda(true)} />}>
+      <div style={{ height: "100vh", display: "flex", "flex-direction": "column" }}>
+        <header style={header}>
+          <button onClick={() => setSidebarOpen(!sidebarOpen())} style={iconBtn} title="Toggle sidebar">⌘</button>
+          <span style={{ "font-weight": 700, "letter-spacing": "-0.3px" }}>Strata</span>
           <Show when={tree() && currentRoot() !== null}>
-            <Viz tree={tree()!} initialRootId={currentRoot()!} onZoomChange={setCurrentRoot} />
+            <Breadcrumb tree={tree()!} currentId={currentRoot()!} onJumpTo={setCurrentRoot} />
           </Show>
-        </main>
-        <Show when={selectedNode()}>
-          <DetailsPanel
-            tree={tree()!}
-            node={selectedNode()}
-            onClose={() => sel.select(null)}
-            onAfterTrash={() => sel.select(null)}
-          />
-        </Show>
+          <div style={{ "margin-left": "auto" }}>
+            <ProgressBar event={event()} active={scanning()} />
+          </div>
+        </header>
+        <div style={{ flex: 1, display: "flex", "min-height": 0 }}>
+          <Sidebar tree={tree()} visible={sidebarOpen()} onPick={handlePick} />
+          <main style={{ flex: 1, display: "flex", "flex-direction": "column", "min-width": 0 }}>
+            <Show when={!tree() && !scanning()}>
+              <div style={emptyWrap}>
+                <h2 style={{ margin: "0 0 8px", "font-weight": 600, "letter-spacing": "-0.5px" }}>Welcome to Strata</h2>
+                <p style={{ margin: "0 0 24px", color: "#6b7280", "font-size": "14px" }}>
+                  Pick a folder to see what's eating your disk.
+                </p>
+                <button onClick={handlePick} style={btnPrimary}>Choose folder…</button>
+              </div>
+            </Show>
+            <Show when={tree() && currentRoot() !== null}>
+              <Viz tree={tree()!} initialRootId={currentRoot()!} onZoomChange={setCurrentRoot} />
+            </Show>
+          </main>
+          <Show when={selectedNode()}>
+            <DetailsPanel
+              tree={tree()!}
+              node={selectedNode()}
+              onClose={() => sel.select(null)}
+              onAfterTrash={() => sel.select(null)}
+            />
+          </Show>
+        </div>
       </div>
-    </div>
+    </Show>
   );
 }
 
