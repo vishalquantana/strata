@@ -18,6 +18,7 @@ fn main() {
             commands::move_to_trash,
             commands::check_full_disk_access,
             commands::open_fda_settings,
+            commands::home_dir,
             fs_watcher::start_watching,
             fs_watcher::stop_watching,
         ])

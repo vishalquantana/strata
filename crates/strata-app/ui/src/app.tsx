@@ -12,6 +12,7 @@ import ProgressBar from "./components/progress-bar";
 import Breadcrumb from "./components/breadcrumb";
 import Sidebar from "./components/sidebar";
 import DetailsPanel from "./components/details-panel";
+import QuickPicker from "./components/quick-picker";
 import { selectionStore } from "./stores/selection";
 
 export default function App() {
@@ -102,10 +103,8 @@ export default function App() {
     })();
   });
 
-  async function handlePick() {
+  async function scanPath(p: string) {
     if (scanning()) return;
-    const p = await pickDirectory();
-    if (!p) return;
     setLastScannedPath(p);
     setTree(null);
     setScanning(true);
@@ -114,15 +113,18 @@ export default function App() {
     await startScan(p);
   }
 
+  async function handlePick() {
+    if (scanning()) return;
+    const p = await pickDirectory();
+    if (!p) return;
+    await scanPath(p);
+  }
+
   async function handleRescan() {
     if (scanning()) return;
     const p = lastScannedPath();
     if (!p) return;
-    setTree(null);
-    setScanning(true);
-    setEvent(null);
-    sel.select(null);
-    await startScan(p);
+    await scanPath(p);
   }
 
   return (
@@ -148,13 +150,7 @@ export default function App() {
           <Sidebar tree={tree()} visible={sidebarOpen()} onPick={handlePick} />
           <main style={{ flex: 1, display: "flex", "flex-direction": "column", "min-width": 0 }}>
             <Show when={!tree() && !scanning()}>
-              <div style={emptyWrap}>
-                <h2 style={{ margin: "0 0 8px", "font-weight": 600, "letter-spacing": "-0.5px" }}>Welcome to Strata</h2>
-                <p style={{ margin: "0 0 24px", color: "#6b7280", "font-size": "14px" }}>
-                  Pick a folder to see what's eating your disk.
-                </p>
-                <button onClick={handlePick} style={btnPrimary}>Choose folder…</button>
-              </div>
+              <QuickPicker onPick={(p) => { void scanPath(p); }} onCustom={handlePick} />
             </Show>
             <Show when={tree() && currentRoot() !== null}>
               <Viz tree={tree()!} initialRootId={currentRoot()!} onZoomChange={setCurrentRoot} />
@@ -189,18 +185,6 @@ const iconBtn = {
   "border-radius": "5px",
   cursor: "pointer",
   "font-size": "12px",
-} as const;
-const emptyWrap = {
-  flex: 1,
-  display: "flex",
-  "flex-direction": "column",
-  "align-items": "center",
-  "justify-content": "center",
-} as const;
-const btnPrimary = {
-  background: "#6c8cff", color: "#fff", border: "none",
-  padding: "10px 22px", "border-radius": "6px",
-  "font-size": "13px", "font-weight": 600, cursor: "pointer",
 } as const;
 const rescanBtn = {
   background: "transparent",

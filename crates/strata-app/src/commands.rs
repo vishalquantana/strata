@@ -62,6 +62,13 @@ pub fn check_full_disk_access() -> FdaStatus {
     check_fda()
 }
 
+/// Return the user's HOME directory so the WebView can build preset paths
+/// like ~/Documents and ~/Downloads without needing the dialog.
+#[tauri::command]
+pub fn home_dir() -> Result<String, String> {
+    std::env::var("HOME").map_err(|e| format!("HOME not set: {e}"))
+}
+
 #[tauri::command]
 pub fn open_fda_settings() -> Result<(), String> {
     Command::new("open")

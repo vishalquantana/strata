@@ -45,6 +45,10 @@ export async function openFdaSettings(): Promise<void> {
   await invoke("open_fda_settings");
 }
 
+export async function homeDir(): Promise<string> {
+  return await invoke<string>("home_dir");
+}
+
 export async function startWatching(path: string): Promise<void> {
   await invoke("start_watching", { path });
 }
