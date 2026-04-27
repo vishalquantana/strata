@@ -12,24 +12,40 @@ use strata_scan::{run, ScanOptions};
 /// for each progress update, and a single `scan-complete` event with the
 /// JSON-serialized tree at the end.
 pub fn start_scan(app: AppHandle, path: PathBuf) {
+    eprintln!("[strata-app] start_scan called for {}", path.display());
     let app = Arc::new(app);
     thread::spawn(move || {
+        eprintln!("[strata-app] scan thread started for {}", path.display());
         let opts = ScanOptions::defaults();
         let app_for_progress = app.clone();
-        // strata_scan::run takes FnMut(&ProgressEvent); wrap in Mutex so the
-        // closure can be called mutably from a single thread.
         let cb_app = Arc::new(Mutex::new(app_for_progress));
+        let mut emit_count: u64 = 0;
         let result = run(&path, opts, move |ev| {
             if let Ok(a) = cb_app.lock() {
-                let _ = a.emit("scan-progress", ev);
+                match a.emit("scan-progress", ev) {
+                    Ok(_) => {
+                        emit_count += 1;
+                        if emit_count <= 3 || emit_count % 50 == 0 {
+                            eprintln!("[strata-app] emitted scan-progress #{emit_count}");
+                        }
+                    }
+                    Err(e) => eprintln!("[strata-app] emit failed: {e}"),
+                }
             }
         });
 
         match result {
             Ok(tree) => {
-                let _ = app.emit("scan-complete", &tree);
+                eprintln!(
+                    "[strata-app] scan complete: {} nodes",
+                    tree.nodes.len()
+                );
+                if let Err(e) = app.emit("scan-complete", &tree) {
+                    eprintln!("[strata-app] scan-complete emit failed: {e}");
+                }
             }
             Err(e) => {
+                eprintln!("[strata-app] scan error: {e}");
                 let _ = app.emit("scan-error", e.to_string());
             }
         }

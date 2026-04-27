@@ -9,11 +9,12 @@
 
 use crate::junk::is_known_junk;
 use crate::model::{DirNode, NodeId, ScanTree, Signals};
-use crate::progress::ProgressEvent;
+use crate::progress::{BigFile, ProgressEvent, TopDir};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use jwalk::WalkDir;
-use std::collections::HashMap;
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap};
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -24,6 +25,15 @@ const THROTTLE_INTERVAL: Duration = Duration::from_millis(250);
 /// On tiny/fast scans the final flush is sufficient; this gate suppresses
 /// spurious mid-walk events.
 const THROTTLE_MIN_NODES: u64 = 1000;
+/// How often to emit a mid-walk `WalkSnapshot` event during Pass 2.
+const SNAPSHOT_INTERVAL: Duration = Duration::from_secs(5);
+/// How many biggest files to track and report in each snapshot.
+const SNAPSHOT_TOP_FILES: usize = 30;
+/// How many top-level directories to report in each snapshot.
+const SNAPSHOT_TOP_DIRS: usize = 12;
+/// Files smaller than this are not considered for the "biggest files" list
+/// (saves heap churn during fast scans of tiny-file directories).
+const SNAPSHOT_FILE_MIN_BYTES: u64 = 1024 * 1024;
 
 /// Walk the given root and return the populated scan tree.
 ///
@@ -205,6 +215,41 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
         anyhow::bail!("scan root produced no entries");
     }
 
+    // Snapshot state: track running totals for depth-1 dirs (children of the
+    // scan root) so we can emit a "what's biggest so far" view mid-walk.
+    let root_id_opt: Option<NodeId> = path_to_id
+        .get(&canonical.to_string_lossy().to_string())
+        .copied();
+    // Map every node to its depth-1 ancestor (or itself if depth == 1). Built
+    // by walking up parent_id once per node — O(N · max_depth).
+    let mut depth1_ancestor: HashMap<NodeId, NodeId> = HashMap::new();
+    for n in &nodes {
+        if n.depth == 1 {
+            depth1_ancestor.insert(n.id, n.id);
+        } else if n.depth > 1 {
+            let mut cur = n.id;
+            loop {
+                let parent = nodes[cur as usize].parent_id;
+                match parent {
+                    Some(p) => {
+                        if nodes[p as usize].depth == 1 {
+                            depth1_ancestor.insert(n.id, p);
+                            break;
+                        }
+                        cur = p;
+                    }
+                    None => break,
+                }
+            }
+        }
+    }
+    // Running size totals keyed by depth-1 NodeId.
+    let mut top_dir_sizes: HashMap<NodeId, u64> = HashMap::new();
+    // Min-heap of (size, path, name) capped at SNAPSHOT_TOP_FILES so we always
+    // have the largest files seen so far. Reverse<u64> makes it a min-heap.
+    let mut biggest_files_heap: BinaryHeap<Reverse<(u64, String, String)>> = BinaryHeap::new();
+    let mut last_snapshot_emit = Instant::now();
+
     // Second pass: tally file sizes & counts INTO the immediate parent dir.
     // We accumulate from leaves up by sorting by depth descending, but for
     // file-level data we need a separate walk that reports files.
@@ -268,6 +313,42 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
         bytes_seen += size;
         nodes_since_last_emit += 1;
         maybe_emit!(progress_cb);
+
+        // --- Snapshot tracking ---
+        // Track top-level (depth-1) dir running size by attributing this
+        // file's bytes to its depth-1 ancestor.
+        if let Some(d1) = depth1_ancestor.get(&parent_id) {
+            *top_dir_sizes.entry(*d1).or_insert(0) += size;
+        } else if let Some(rid) = root_id_opt {
+            // File directly under scan root: account it against the root.
+            if parent_id == rid {
+                *top_dir_sizes.entry(rid).or_insert(0) += size;
+            }
+        }
+
+        // Track biggest files (only ≥ SNAPSHOT_FILE_MIN_BYTES to skip churn).
+        if size >= SNAPSHOT_FILE_MIN_BYTES {
+            let path_str = entry.path().to_string_lossy().to_string();
+            let name = entry
+                .path()
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| path_str.clone());
+            if biggest_files_heap.len() < SNAPSHOT_TOP_FILES {
+                biggest_files_heap.push(Reverse((size, path_str, name)));
+            } else if let Some(Reverse((min_size, _, _))) = biggest_files_heap.peek() {
+                if size > *min_size {
+                    biggest_files_heap.pop();
+                    biggest_files_heap.push(Reverse((size, path_str, name)));
+                }
+            }
+        }
+
+        // Periodic snapshot emit.
+        if last_snapshot_emit.elapsed() >= SNAPSHOT_INTERVAL {
+            emit_snapshot(progress_cb, &nodes, &top_dir_sizes, &biggest_files_heap);
+            last_snapshot_emit = Instant::now();
+        }
     }
 
     // Final flush: emit current totals right before returning so the UI always
@@ -277,6 +358,10 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
         files_seen,
         bytes_seen,
     });
+
+    // Final snapshot too, so the UI shows the most up-to-date "biggest finds"
+    // right before the visualization replaces the scanning view.
+    emit_snapshot(progress_cb, &nodes, &top_dir_sizes, &biggest_files_heap);
 
     // Third pass: roll subtree totals up. Process leaves before parents.
     let mut order: Vec<NodeId> = (0..nodes.len() as NodeId).collect();
@@ -319,4 +404,44 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
 
 fn epoch() -> DateTime<Utc> {
     DateTime::<Utc>::from_timestamp(0, 0).unwrap()
+}
+
+/// Build and emit a `WalkSnapshot` from the current Pass-2 running state.
+fn emit_snapshot(
+    progress_cb: &mut impl FnMut(&ProgressEvent),
+    nodes: &[DirNode],
+    top_dir_sizes: &HashMap<NodeId, u64>,
+    biggest_files_heap: &BinaryHeap<Reverse<(u64, String, String)>>,
+) {
+    // Top-level dirs sorted by running size desc.
+    let mut top_dirs: Vec<TopDir> = top_dir_sizes
+        .iter()
+        .filter_map(|(id, sz)| {
+            let n = nodes.get(*id as usize)?;
+            Some(TopDir {
+                path: n.path.clone(),
+                name: n.name.clone(),
+                size_bytes: *sz,
+            })
+        })
+        .collect();
+    top_dirs.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+    top_dirs.truncate(SNAPSHOT_TOP_DIRS);
+
+    // Biggest files sorted by size desc. Heap is min-heap of size, so just
+    // collect and sort.
+    let mut biggest_files: Vec<BigFile> = biggest_files_heap
+        .iter()
+        .map(|Reverse((sz, path, name))| BigFile {
+            path: path.clone(),
+            name: name.clone(),
+            size_bytes: *sz,
+        })
+        .collect();
+    biggest_files.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+
+    progress_cb(&ProgressEvent::WalkSnapshot {
+        top_dirs,
+        biggest_files,
+    });
 }

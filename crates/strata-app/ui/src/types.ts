@@ -41,9 +41,22 @@ export interface Volume {
   is_internal: boolean;
 }
 
+export interface BigFile {
+  path: string;
+  name: string;
+  size_bytes: number;
+}
+
+export interface TopDir {
+  path: string;
+  name: string;
+  size_bytes: number;
+}
+
 export type ProgressEvent =
   | { event: "walk_started"; root: string }
   | { event: "walk_progress"; dirs_seen: number; files_seen: number; bytes_seen: number }
+  | { event: "walk_snapshot"; top_dirs: TopDir[]; biggest_files: BigFile[] }
   | { event: "walk_completed"; node_count: number }
   | { event: "probe_started"; kind: string }
   | { event: "probe_completed"; kind: string; applied: number }
