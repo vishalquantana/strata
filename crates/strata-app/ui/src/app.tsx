@@ -47,6 +47,15 @@ export default function App() {
           <ProgressBar event={event()} active={scanning()} />
         </div>
       </header>
+      <Show when={!tree() && !scanning()}>
+        <div style={emptyWrap}>
+          <h2 style={{ margin: "0 0 8px", "font-weight": 600, "letter-spacing": "-0.5px" }}>Welcome to Strata</h2>
+          <p style={{ margin: "0 0 24px", color: "#6b7280", "font-size": "14px" }}>
+            Pick a folder to see what's eating your disk — and what you've forgotten.
+          </p>
+          <button onClick={handlePick} style={{ ...btn, padding: "10px 22px", "font-size": "13px" }}>Choose folder…</button>
+        </div>
+      </Show>
       <Show when={tree() && currentRoot() !== null}>
         <Viz tree={tree()!} initialRootId={currentRoot()!} onZoomChange={setCurrentRoot} />
       </Show>
@@ -64,4 +73,12 @@ const btn = {
   background: "#6c8cff", color: "#fff", border: "none",
   padding: "6px 14px", "border-radius": "6px",
   "font-size": "12px", "font-weight": 600, cursor: "pointer",
+} as const;
+const emptyWrap = {
+  flex: 1,
+  display: "flex",
+  "flex-direction": "column",
+  "align-items": "center",
+  "justify-content": "center",
+  color: "#e5e7eb",
 } as const;
