@@ -19,6 +19,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 strata-scan = { path = "../strata-scan" }
 anyhow = "1"
 sysinfo = { version = "0.32", default-features = false, features = ["disk"] }
+trash = "5"
+notify = "6"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

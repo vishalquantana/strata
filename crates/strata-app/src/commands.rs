@@ -1,9 +1,11 @@
 //! Tauri command handlers exposed to the WebView.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
+use crate::permissions::{check as check_fda, FdaStatus};
 use crate::scan_runner;
 use crate::volumes::{list_volumes as list_volumes_impl, Volume};
 
@@ -31,4 +33,38 @@ pub async fn pick_directory(app: AppHandle) -> Option<String> {
 #[tauri::command]
 pub fn start_scan(app: AppHandle, path: String) {
     scan_runner::start_scan(app, PathBuf::from(path));
+}
+
+#[tauri::command]
+pub fn reveal_in_finder(path: String) -> Result<(), String> {
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Err(format!("Path does not exist: {path}"));
+    }
+    Command::new("open")
+        .arg("-R")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| format!("Failed to invoke open: {e}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn move_to_trash(path: String) -> Result<(), String> {
+    trash::delete(&path).map_err(|e| format!("Failed to trash {path}: {e}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn check_full_disk_access() -> FdaStatus {
+    check_fda()
+}
+
+#[tauri::command]
+pub fn open_fda_settings() -> Result<(), String> {
+    Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
+        .spawn()
+        .map_err(|e| format!("Failed to open Settings: {e}"))?;
+    Ok(())
 }
