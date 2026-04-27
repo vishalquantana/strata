@@ -126,6 +126,25 @@ export default function Viz(props: Props) {
   });
 
   createEffect(() => {
+    if (ctxMenu() === null) return;
+    const onWindowClick = (e: MouseEvent) => {
+      // Dismiss only if click target is NOT inside the menu div.
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest("[data-ctx-menu]")) return;
+      setCtxMenu(null);
+    };
+    // Defer attach to next tick so the right-click that opened the menu
+    // doesn't immediately close it.
+    const id = window.setTimeout(() => {
+      window.addEventListener("click", onWindowClick);
+    }, 0);
+    onCleanup(() => {
+      window.clearTimeout(id);
+      window.removeEventListener("click", onWindowClick);
+    });
+  });
+
+  createEffect(() => {
     hoveredId();
     sel.selectedId();
     matcher();
@@ -205,6 +224,7 @@ export default function Viz(props: Props) {
           if (!node) return null;
           return (
             <div
+              data-ctx-menu
               style={{
                 position: "fixed",
                 left: `${m().x}px`,

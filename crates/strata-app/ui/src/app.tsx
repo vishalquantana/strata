@@ -33,33 +33,7 @@ export default function App() {
     return t.nodes[id] ?? null;
   });
 
-  onMount(async () => {
-    const initial = await checkFullDiskAccess();
-    setHasFda(initial === "granted");
-    setFdaChecked(true);
-    await onScanProgress((ev) => setEvent(ev));
-    await onScanComplete(async (t) => {
-      setTree(t);
-      setCurrentRoot(t.root_id);
-      setScanning(false);
-      try { await startWatching(t.source_path); } catch {}
-    });
-    await onScanError((msg) => {
-      setScanning(false);
-      setEvent({ event: "error", message: msg });
-    });
-    let rescanTimer: number | undefined;
-    await onFsChange((_c: FsChange) => {
-      if (rescanTimer !== undefined) clearTimeout(rescanTimer);
-      rescanTimer = window.setTimeout(() => {
-        const t = tree();
-        if (!t || scanning()) return;
-        setScanning(true);
-        setEvent({ event: "walk_started", root: t.source_path });
-        startScan(t.source_path);
-      }, 1500);
-    });
-
+  onMount(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         // Priority 1: dismiss context menu if open
@@ -97,9 +71,39 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     onCleanup(() => window.removeEventListener("keydown", onKey));
+
+    // run async setup separately so onCleanup above is registered synchronously
+    void (async () => {
+      const initial = await checkFullDiskAccess();
+      setHasFda(initial === "granted");
+      setFdaChecked(true);
+      await onScanProgress((ev) => setEvent(ev));
+      await onScanComplete(async (t) => {
+        setTree(t);
+        setCurrentRoot(t.root_id);
+        setScanning(false);
+        try { await startWatching(t.source_path); } catch {}
+      });
+      await onScanError((msg) => {
+        setScanning(false);
+        setEvent({ event: "error", message: msg });
+      });
+      let rescanTimer: number | undefined;
+      await onFsChange((_c: FsChange) => {
+        if (rescanTimer !== undefined) clearTimeout(rescanTimer);
+        rescanTimer = window.setTimeout(() => {
+          const t = tree();
+          if (!t || scanning()) return;
+          setScanning(true);
+          setEvent({ event: "walk_started", root: t.source_path });
+          startScan(t.source_path);
+        }, 1500);
+      });
+    })();
   });
 
   async function handlePick() {
+    if (scanning()) return;
     const p = await pickDirectory();
     if (!p) return;
     setLastScannedPath(p);
@@ -111,6 +115,7 @@ export default function App() {
   }
 
   async function handleRescan() {
+    if (scanning()) return;
     const p = lastScannedPath();
     if (!p) return;
     setTree(null);
