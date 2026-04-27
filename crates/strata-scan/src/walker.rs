@@ -25,8 +25,8 @@ const THROTTLE_INTERVAL: Duration = Duration::from_millis(250);
 /// On tiny/fast scans the final flush is sufficient; this gate suppresses
 /// spurious mid-walk events.
 const THROTTLE_MIN_NODES: u64 = 1000;
-/// How often to emit a mid-walk `WalkSnapshot` event during Pass 2 after the
-/// first one has been sent.
+/// How often to emit a mid-walk `WalkSnapshot` event after the first one has
+/// been sent.
 const SNAPSHOT_INTERVAL: Duration = Duration::from_secs(30);
 /// Delay before the very first snapshot, so the UI shows a treemap quickly
 /// rather than waiting a full SNAPSHOT_INTERVAL.
@@ -92,12 +92,28 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
         }};
     }
 
-    // First pass: enumerate every directory, build flat node list, capture
-    // each dir's own metadata. Use parallel walk for speed; sort within dirs
-    // for deterministic snapshot tests.
+    // Single pass: enumerate every directory AND every file in one walk.
+    // Directories register a NodeId and (incrementally) a depth-1-ancestor
+    // mapping; files immediately tally into their parent dir AND into running
+    // snapshot state so the UI can show a treemap from the very first
+    // SNAPSHOT_FIRST_DELAY tick rather than waiting for a separate pass.
     let mut nodes: Vec<DirNode> = Vec::new();
-    // Map full path -> NodeId so we can wire up parent/child relationships.
+    // Map full path -> NodeId so we can wire up parent/child relationships
+    // and look up parents for files.
     let mut path_to_id: HashMap<String, NodeId> = HashMap::new();
+    // Snapshot state — accumulates as files stream in.
+    let mut root_id_opt: Option<NodeId> = None;
+    // Map every dir NodeId to its depth-1 ancestor (or itself if depth == 1).
+    // Built incrementally during the walk so files seen later can attribute
+    // their bytes to a top-level bucket immediately.
+    let mut depth1_ancestor: HashMap<NodeId, NodeId> = HashMap::new();
+    // Running size totals keyed by depth-1 NodeId.
+    let mut top_dir_sizes: HashMap<NodeId, u64> = HashMap::new();
+    // Min-heap of (size, path, name) capped at SNAPSHOT_TOP_FILES so we always
+    // have the largest files seen so far. Reverse<u64> makes it a min-heap.
+    let mut biggest_files_heap: BinaryHeap<Reverse<(u64, String, String)>> = BinaryHeap::new();
+    let mut last_snapshot_emit = Instant::now();
+    let mut first_snapshot_sent = false;
 
     // Single-threaded enumeration of directories (jwalk gives parallelism for
     // descent but we want deterministic order while assigning ids).
@@ -134,6 +150,85 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
             Ok(e) => e,
             Err(_) => continue, // permission denied etc — skip silently
         };
+
+        // --- File branch: tally size/count into parent and update snapshot state. ---
+        if entry.file_type().is_file() {
+            let parent_path = match entry.path().parent() {
+                Some(p) => p.to_string_lossy().to_string(),
+                None => continue,
+            };
+            let parent_id = match path_to_id.get(&parent_path) {
+                Some(id) => *id,
+                None => continue, // file under a dir we haven't registered (unlikely with sorted walk)
+            };
+            let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+
+            let node = &mut nodes[parent_id as usize];
+            node.size_bytes += size;
+            node.file_count += 1;
+
+            // Roll mtime up: take max of own mtime and the file's mtime.
+            if let Ok(meta) = entry.metadata() {
+                if let Ok(mt) = meta.modified() {
+                    let mt_dt: DateTime<Utc> = mt.into();
+                    if mt_dt > node.signals.last_modified_at {
+                        node.signals.last_modified_at = mt_dt;
+                    }
+                }
+            }
+
+            files_seen += 1;
+            bytes_seen += size;
+            nodes_since_last_emit += 1;
+            maybe_emit!(progress_cb);
+
+            // --- Snapshot tracking ---
+            // Attribute this file's bytes to its depth-1 ancestor bucket.
+            if let Some(d1) = depth1_ancestor.get(&parent_id).copied() {
+                *top_dir_sizes.entry(d1).or_insert(0) += size;
+            } else if let Some(rid) = root_id_opt {
+                // File directly under scan root: account it against the root.
+                if parent_id == rid {
+                    *top_dir_sizes.entry(rid).or_insert(0) += size;
+                }
+            }
+
+            // Track biggest files (only ≥ SNAPSHOT_FILE_MIN_BYTES to skip churn).
+            if size >= SNAPSHOT_FILE_MIN_BYTES {
+                let path_str = entry.path().to_string_lossy().to_string();
+                let name = entry
+                    .path()
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| path_str.clone());
+                if biggest_files_heap.len() < SNAPSHOT_TOP_FILES {
+                    biggest_files_heap.push(Reverse((size, path_str, name)));
+                } else if let Some(Reverse((min_size, _, _))) = biggest_files_heap.peek() {
+                    if size > *min_size {
+                        biggest_files_heap.pop();
+                        biggest_files_heap.push(Reverse((size, path_str, name)));
+                    }
+                }
+            }
+
+            // Periodic snapshot emit. First one fires after SNAPSHOT_FIRST_DELAY
+            // so the user sees a treemap quickly; subsequent ones use the
+            // (longer) SNAPSHOT_INTERVAL.
+            let due_at = if first_snapshot_sent {
+                SNAPSHOT_INTERVAL
+            } else {
+                SNAPSHOT_FIRST_DELAY
+            };
+            if last_snapshot_emit.elapsed() >= due_at {
+                emit_snapshot(progress_cb, &nodes, &top_dir_sizes, &biggest_files_heap);
+                last_snapshot_emit = Instant::now();
+                first_snapshot_sent = true;
+            }
+
+            continue;
+        }
+
+        // --- Directory branch ---
         if !entry.file_type().is_dir() {
             continue;
         }
@@ -204,12 +299,23 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
         path_to_id.insert(path_str, id);
         nodes.push(node);
 
-        // Wire up to parent
+        // Wire up to parent + maintain depth-1 ancestor map incrementally so
+        // files seen later attribute correctly to a top-level bucket without
+        // a second pass.
         if let Some(pid) = parent_id {
             nodes[pid as usize].children.push(id);
         }
+        if depth == 0 {
+            root_id_opt = Some(id);
+        } else if depth == 1 {
+            depth1_ancestor.insert(id, id);
+        } else if let Some(pid) = parent_id {
+            if let Some(d1) = depth1_ancestor.get(&pid).copied() {
+                depth1_ancestor.insert(id, d1);
+            }
+        }
 
-        // Update running counters for Pass 1 (directory accepted).
+        // Update running counters (directory accepted).
         dirs_seen += 1;
         nodes_since_last_emit += 1;
         maybe_emit!(progress_cb);
@@ -217,151 +323,6 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
 
     if nodes.is_empty() {
         anyhow::bail!("scan root produced no entries");
-    }
-
-    // Snapshot state: track running totals for depth-1 dirs (children of the
-    // scan root) so we can emit a "what's biggest so far" view mid-walk.
-    let root_id_opt: Option<NodeId> = path_to_id
-        .get(&canonical.to_string_lossy().to_string())
-        .copied();
-    // Map every node to its depth-1 ancestor (or itself if depth == 1). Built
-    // by walking up parent_id once per node — O(N · max_depth).
-    let mut depth1_ancestor: HashMap<NodeId, NodeId> = HashMap::new();
-    for n in &nodes {
-        if n.depth == 1 {
-            depth1_ancestor.insert(n.id, n.id);
-        } else if n.depth > 1 {
-            let mut cur = n.id;
-            loop {
-                let parent = nodes[cur as usize].parent_id;
-                match parent {
-                    Some(p) => {
-                        if nodes[p as usize].depth == 1 {
-                            depth1_ancestor.insert(n.id, p);
-                            break;
-                        }
-                        cur = p;
-                    }
-                    None => break,
-                }
-            }
-        }
-    }
-    // Running size totals keyed by depth-1 NodeId.
-    let mut top_dir_sizes: HashMap<NodeId, u64> = HashMap::new();
-    // Min-heap of (size, path, name) capped at SNAPSHOT_TOP_FILES so we always
-    // have the largest files seen so far. Reverse<u64> makes it a min-heap.
-    let mut biggest_files_heap: BinaryHeap<Reverse<(u64, String, String)>> = BinaryHeap::new();
-    let mut last_snapshot_emit = Instant::now();
-    let mut first_snapshot_sent = false;
-
-    // Second pass: tally file sizes & counts INTO the immediate parent dir.
-    // We accumulate from leaves up by sorting by depth descending, but for
-    // file-level data we need a separate walk that reports files.
-    for entry in WalkDir::new(&canonical)
-        .sort(true)
-        .skip_hidden(false)
-        .process_read_dir(move |_depth, _path, _state, children| {
-            children.iter_mut().for_each(|child_result| {
-                if let Ok(child) = child_result {
-                    if child.file_type().is_dir() {
-                        let on_same_device = child
-                            .metadata()
-                            .map(|m| m.dev() == root_dev)
-                            .unwrap_or(true); // on error, assume same and let natural errors surface
-                        if !on_same_device {
-                            eprintln!(
-                                "[strata-scan] skipping cross-device mount: {}",
-                                child.path().display()
-                            );
-                            child.read_children_path = None;
-                        }
-                    }
-                }
-            });
-        })
-        .into_iter()
-    {
-        let entry = match entry {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
-        if !entry.file_type().is_file() {
-            continue;
-        }
-        let parent = match entry.path().parent() {
-            Some(p) => p.to_string_lossy().to_string(),
-            None => continue,
-        };
-        let parent_id = match path_to_id.get(&parent) {
-            Some(id) => *id,
-            None => continue,
-        };
-        let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-
-        let node = &mut nodes[parent_id as usize];
-        node.size_bytes += size;
-        node.file_count += 1;
-
-        // Roll mtime up: take max of own mtime and the file's mtime.
-        if let Ok(meta) = entry.metadata() {
-            if let Ok(mt) = meta.modified() {
-                let mt_dt: DateTime<Utc> = mt.into();
-                if mt_dt > node.signals.last_modified_at {
-                    node.signals.last_modified_at = mt_dt;
-                }
-            }
-        }
-
-        // Update running counters for Pass 2 (file accepted).
-        files_seen += 1;
-        bytes_seen += size;
-        nodes_since_last_emit += 1;
-        maybe_emit!(progress_cb);
-
-        // --- Snapshot tracking ---
-        // Track top-level (depth-1) dir running size by attributing this
-        // file's bytes to its depth-1 ancestor.
-        if let Some(d1) = depth1_ancestor.get(&parent_id) {
-            *top_dir_sizes.entry(*d1).or_insert(0) += size;
-        } else if let Some(rid) = root_id_opt {
-            // File directly under scan root: account it against the root.
-            if parent_id == rid {
-                *top_dir_sizes.entry(rid).or_insert(0) += size;
-            }
-        }
-
-        // Track biggest files (only ≥ SNAPSHOT_FILE_MIN_BYTES to skip churn).
-        if size >= SNAPSHOT_FILE_MIN_BYTES {
-            let path_str = entry.path().to_string_lossy().to_string();
-            let name = entry
-                .path()
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| path_str.clone());
-            if biggest_files_heap.len() < SNAPSHOT_TOP_FILES {
-                biggest_files_heap.push(Reverse((size, path_str, name)));
-            } else if let Some(Reverse((min_size, _, _))) = biggest_files_heap.peek() {
-                if size > *min_size {
-                    biggest_files_heap.pop();
-                    biggest_files_heap.push(Reverse((size, path_str, name)));
-                }
-            }
-        }
-
-        // Periodic snapshot emit. First one fires after SNAPSHOT_FIRST_DELAY
-        // so the user sees a treemap quickly; subsequent ones use the
-        // (longer) SNAPSHOT_INTERVAL.
-        let due_at = if first_snapshot_sent {
-            SNAPSHOT_INTERVAL
-        } else {
-            SNAPSHOT_FIRST_DELAY
-        };
-        if last_snapshot_emit.elapsed() >= due_at {
-            emit_snapshot(progress_cb, &nodes, &top_dir_sizes, &biggest_files_heap);
-            last_snapshot_emit = Instant::now();
-            first_snapshot_sent = true;
-        }
     }
 
     // Final flush: emit current totals right before returning so the UI always

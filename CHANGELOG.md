@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-04-27
+
+### Changed
+- **Single-pass walker.** Previously the scanner ran two sequential passes —
+  Pass 1 enumerated every directory, then Pass 2 walked all files and emitted
+  the running snapshots. On large roots like `/`, Pass 1 alone took several
+  minutes, so the UI sat at "0 files, 0 B" with no visuals until Pass 2
+  finally started. Now a single walk handles both: when an entry is a file,
+  it tallies into its parent dir AND updates the running top-dirs/biggest-files
+  state immediately, with `depth1_ancestor` built incrementally. First
+  snapshot still fires after ~5 s, but it now contains real data from the
+  very first directory the walker enters.
+
+### Fixed
+- **"Stuck on Walking…" perception bug.** Counters and treemap now begin
+  populating from second 1 of the scan rather than waiting for the directory
+  enumeration phase to complete.
+
 ## [0.3.3] - 2026-04-27
 
 ### Added
@@ -152,7 +170,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drill-down / zoom-out via click and breadcrumb
 - Volume listing via `sysinfo`
 
-[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/vishalquantana/strata/releases/tag/v0.3.4
 [0.3.3]: https://github.com/vishalquantana/strata/releases/tag/v0.3.3
 [0.3.2]: https://github.com/vishalquantana/strata/releases/tag/v0.3.2
 [0.3.1]: https://github.com/vishalquantana/strata/releases/tag/v0.3.1
