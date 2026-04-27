@@ -22,9 +22,8 @@ pub fn start_watching(
     state: State<'_, WatcherState>,
     path: String,
 ) -> Result<(), String> {
-    let mut guard = state.0.lock().unwrap();
-    *guard = None; // drop any existing watcher first
-
+    // Build and verify the new watcher BEFORE touching the existing state.
+    // This preserves the invariant: guard is None only if stop_watching was called.
     let app2 = app.clone();
     let mut watcher = recommended_watcher(move |res: notify::Result<notify::Event>| {
         if let Ok(ev) = res {
@@ -44,17 +43,20 @@ pub fn start_watching(
     })
     .map_err(|e| e.to_string())?;
 
+    // Attempt to start watching; if this errors the old watcher is untouched.
     watcher
         .watch(&PathBuf::from(&path), RecursiveMode::Recursive)
         .map_err(|e| e.to_string())?;
 
+    // Only now acquire the lock and atomically replace the old watcher.
+    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
     *guard = Some(watcher);
     Ok(())
 }
 
 #[tauri::command]
 pub fn stop_watching(state: State<'_, WatcherState>) -> Result<(), String> {
-    let mut guard = state.0.lock().unwrap();
+    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
     *guard = None;
     Ok(())
 }
