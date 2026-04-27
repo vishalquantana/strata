@@ -1,0 +1,39 @@
+[package]
+name = "strata-scan"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Strata disk scanner — walks a directory tree and emits a signal-rich JSON tree."
+
+[[bin]]
+name = "strata-scan"
+path = "src/main.rs"
+
+[lib]
+name = "strata_scan"
+path = "src/lib.rs"
+
+[dependencies]
+jwalk = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+blake3 = "1"
+chrono = { version = "0.4", features = ["serde"] }
+xattr = "1"
+anyhow = "1"
+thiserror = "1"
+crossbeam-channel = "0.5"
+once_cell = "1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.9"
+core-foundation-sys = "0.8"
+
+[dev-dependencies]
+tempfile = "3"
+assert_cmd = "2"
+predicates = "3"
+insta = { version = "1", features = ["json"] }

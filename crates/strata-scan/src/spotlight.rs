@@ -1,0 +1,1 @@
+//! macOS Spotlight metadata access.
