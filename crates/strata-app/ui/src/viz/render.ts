@@ -17,25 +17,29 @@ export interface RenderInput {
   shapes: Shape[];
   nodesById: Map<number, DirNode>;
   hoveredId: number | null;
+  selectedId: number | null;
+  isMatched: (n: DirNode) => boolean;
 }
 
 export function render(ctx: CanvasRenderingContext2D, input: RenderInput) {
   for (const s of input.shapes) {
     const node = input.nodesById.get(s.id)!;
+    const matched = input.isMatched(node);
+    ctx.globalAlpha = matched ? 1 : 0.2;
     const fill = colorForNode(node);
-    ctx.fillStyle = fill;
     if (s.kind === "rect" && s.rect) {
-      drawRect(ctx, s.rect, fill, node, input.hoveredId === s.id);
+      drawRect(ctx, s.rect, fill, node, input.hoveredId === s.id || input.selectedId === s.id);
     } else if (s.kind === "arc" && s.arc) {
-      drawArc(ctx, s.arc, fill, input.hoveredId === s.id);
+      drawArc(ctx, s.arc, fill, input.hoveredId === s.id || input.selectedId === s.id);
     } else if (s.kind === "morph" && s.rectFrom && s.arcTo && s.morphT !== undefined) {
-      ctx.globalAlpha = 1 - s.morphT;
+      const tBase = matched ? 1 : 0.2;
+      ctx.globalAlpha = tBase * (1 - s.morphT);
       drawRect(ctx, s.rectFrom, fill, node, false);
-      ctx.globalAlpha = s.morphT;
+      ctx.globalAlpha = tBase * s.morphT;
       drawArc(ctx, s.arcTo, fill, false);
-      ctx.globalAlpha = 1;
     }
   }
+  ctx.globalAlpha = 1;
 }
 
 function drawRect(

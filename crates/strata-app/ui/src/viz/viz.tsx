@@ -8,6 +8,8 @@ import { render, type Shape } from "./render";
 import { hitTestRects, hitTestArcs } from "./hit-test";
 import { buildMorphShapes, easeInOutCubic } from "./morph";
 import Toggle, { type VizMode } from "../components/toggle";
+import { makeMatcher } from "../stores/filters";
+import { selectionStore } from "../stores/selection";
 
 interface Props {
   tree: ScanTree;
@@ -22,6 +24,8 @@ export default function Viz(props: Props) {
   const [hoveredId, setHoveredId] = createSignal<number | null>(null);
   const [zoomRoot, setZoomRoot] = createSignal<number>(props.initialRootId);
   const [mode, setMode] = createSignal<VizMode>("treemap");
+  const matcher = makeMatcher();
+  const sel = selectionStore();
 
   let rects: Rect[] = [];
   let arcs: Arc[] = [];
@@ -56,7 +60,13 @@ export default function Viz(props: Props) {
   function drawCurrent() {
     if (!ctx) return;
     clear(ctx, cssWidth, cssHeight);
-    render(ctx, { shapes: shapesForMode(mode()), nodesById, hoveredId: hoveredId() });
+    render(ctx, {
+      shapes: shapesForMode(mode()),
+      nodesById,
+      hoveredId: hoveredId(),
+      selectedId: sel.selectedId(),
+      isMatched: matcher(),
+    });
   }
 
   function startMorph(to: VizMode) {
@@ -72,7 +82,13 @@ export default function Viz(props: Props) {
       if (!ctx) return;
       clear(ctx, cssWidth, cssHeight);
       const shapes = buildMorphShapes(rects, arcs, tDirected);
-      render(ctx, { shapes, nodesById, hoveredId: null });
+      render(ctx, {
+        shapes,
+        nodesById,
+        hoveredId: null,
+        selectedId: sel.selectedId(),
+        isMatched: matcher(),
+      });
       if (tRaw < 1) {
         rafId = requestAnimationFrame(tick);
       } else {
@@ -103,6 +119,8 @@ export default function Viz(props: Props) {
 
   createEffect(() => {
     hoveredId();
+    sel.selectedId();
+    matcher();
     if (morphFrom === null) drawCurrent();
   });
   createEffect(() => {
@@ -129,7 +147,11 @@ export default function Viz(props: Props) {
 
   function onClick() {
     const id = hoveredId();
-    if (id === null) return;
+    if (id === null) {
+      sel.select(null);
+      return;
+    }
+    sel.select(id);
     const node = nodesById.get(id);
     if (!node || node.children.length === 0) return;
     setZoomRoot(id);
