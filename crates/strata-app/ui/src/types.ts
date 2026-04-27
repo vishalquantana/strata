@@ -22,6 +22,7 @@ export interface DirNode {
   file_count: number;
   signals: Signals;
   children: NodeId[];
+  is_file?: boolean;
 }
 
 export interface ScanTree {

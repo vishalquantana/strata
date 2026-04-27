@@ -53,7 +53,10 @@ export default function Viz(props: Props) {
     cssHeight = r.height;
     nodesById = new Map(props.tree.nodes.map((n) => [n.id, n]));
     const h = buildHierarchy(props.tree, zoomRoot());
-    rects = computeTreemap(h, cssWidth, cssHeight);
+    // Use a tiny threshold so every-file leaves down to ~1px² still render —
+    // gives the GrandPerspective-style "see everything at once" view. Render
+    // pass already drops sub-pixel rects, so this is just a layout filter.
+    rects = computeTreemap(h, cssWidth, cssHeight, 0);
     arcs = computeSunburst(h, cssWidth, cssHeight);
     drawCurrent();
   }

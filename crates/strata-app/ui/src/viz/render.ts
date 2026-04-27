@@ -28,6 +28,9 @@ export function render(ctx: CanvasRenderingContext2D, input: RenderInput) {
     ctx.globalAlpha = matched ? 1 : 0.2;
     const fill = colorForNode(node);
     if (s.kind === "rect" && s.rect) {
+      // Skip sub-pixel tiles — with every-file leaves we get many nodes that
+      // would render as invisible slivers and just waste fillRect calls.
+      if (s.rect.w < 1 || s.rect.h < 1) continue;
       drawRect(ctx, s.rect, fill, node, input.hoveredId === s.id || input.selectedId === s.id);
     } else if (s.kind === "arc" && s.arc) {
       drawArc(ctx, s.arc, fill, input.hoveredId === s.id || input.selectedId === s.id);

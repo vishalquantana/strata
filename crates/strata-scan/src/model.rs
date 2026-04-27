@@ -69,7 +69,10 @@ impl Signals {
     }
 }
 
-/// One directory in the scan tree. Children are referenced by NodeId.
+/// One node in the scan tree. Despite the legacy name, a node can be either
+/// a directory or an individual file (large files ≥ FILE_NODE_MIN_BYTES are
+/// promoted to leaf nodes so the treemap can render them as distinct tiles).
+/// Files are leaves: `children` is empty and `is_file` is true.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DirNode {
     pub id: NodeId,
@@ -80,13 +83,19 @@ pub struct DirNode {
     pub name: String,
     /// Depth from scan root (root = 0).
     pub depth: u16,
-    /// Recursive total bytes (this dir + all descendants).
+    /// For dirs: recursive total bytes (this dir's small-files lump + all
+    /// descendant dirs and big-file leaf nodes).
+    /// For files: this file's own size.
     pub size_bytes: u64,
     /// Recursive total file count (regular files only — not symlinks or directories).
     pub file_count: u64,
     pub signals: Signals,
-    /// IDs of immediate child directories.
+    /// IDs of immediate child nodes (dirs and big-file leaves).
     pub children: Vec<NodeId>,
+    /// True iff this node represents an individual file leaf, false for dirs.
+    /// Defaults to false so older serialized trees deserialize cleanly.
+    #[serde(default)]
+    pub is_file: bool,
 }
 
 /// The full scan result — flat list of nodes plus the root id for traversal.

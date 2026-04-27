@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.8] - 2026-04-27
+
+### Added
+- **Every-file treemap (GrandPerspective-style).** The post-scan treemap now
+  shows individual files as leaf tiles, not just directories. Any file ≥ 64 KB
+  is promoted to its own `DirNode` leaf during the walk; smaller files lump
+  into the parent dir's `size_bytes` (sub-pixel anyway). On a typical Mac `/`
+  scan this produces ~100 K visible tiles — every meaningful file is its own
+  rectangle, sized proportionally, colored by staleness, and clickable for
+  Reveal in Finder / Move to Trash.
+
+### Changed
+- `DirNode` gained an `is_file: bool` field (defaults to false on older
+  serialized trees, so saved snapshots still load).
+- Treemap `visibleThreshold` lowered from 0.5 % of total area to 0 — every
+  rect ≥ 1 px² is laid out. Render pass drops sub-pixel tiles so we don't
+  pay for invisible `fillRect` calls.
+
 ## [0.3.7] - 2026-04-27
 
 ### Added
@@ -206,7 +224,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drill-down / zoom-out via click and breadcrumb
 - Volume listing via `sysinfo`
 
-[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.7...HEAD
+[Unreleased]: https://github.com/vishalquantana/strata/compare/v0.3.8...HEAD
+[0.3.8]: https://github.com/vishalquantana/strata/releases/tag/v0.3.8
 [0.3.7]: https://github.com/vishalquantana/strata/releases/tag/v0.3.7
 [0.3.6]: https://github.com/vishalquantana/strata/releases/tag/v0.3.6
 [0.3.5]: https://github.com/vishalquantana/strata/releases/tag/v0.3.5

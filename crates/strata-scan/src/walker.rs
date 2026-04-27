@@ -40,6 +40,13 @@ const SNAPSHOT_TOP_DIRS: usize = 12;
 /// Files smaller than this are not considered for the "biggest files" list
 /// (saves heap churn during fast scans of tiny-file directories).
 const SNAPSHOT_FILE_MIN_BYTES: u64 = 1024 * 1024;
+/// Files at or above this size get their own leaf node in the scan tree, so
+/// the post-scan treemap can render them as individual tiles. Files below
+/// this threshold are absorbed into their parent dir's `size_bytes` lump
+/// (they'd render as sub-pixel tiles anyway and would dominate memory).
+/// 64 KB is the sweet spot: invisible to the eye on a 1280-wide treemap and
+/// keeps a `/` scan around ~30 MB of node memory.
+const FILE_NODE_MIN_BYTES: u64 = 64 * 1024;
 
 /// Walk the given root and return the populated scan tree.
 ///
@@ -165,18 +172,62 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
             };
             let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
 
-            let node = &mut nodes[parent_id as usize];
-            node.size_bytes += size;
-            node.file_count += 1;
+            // Always increment the file count on the parent.
+            nodes[parent_id as usize].file_count += 1;
 
-            // Roll mtime up: take max of own mtime and the file's mtime.
-            if let Ok(meta) = entry.metadata() {
-                if let Ok(mt) = meta.modified() {
-                    let mt_dt: DateTime<Utc> = mt.into();
-                    if mt_dt > node.signals.last_modified_at {
-                        node.signals.last_modified_at = mt_dt;
-                    }
+            // Capture file mtime for both parent rollup and (if promoted) the
+            // file leaf node itself.
+            let file_mtime: Option<DateTime<Utc>> =
+                entry.metadata().ok().and_then(|m| m.modified().ok()).map(DateTime::<Utc>::from);
+
+            // Roll mtime up onto the parent.
+            if let Some(mt) = file_mtime {
+                let pn = &mut nodes[parent_id as usize];
+                if mt > pn.signals.last_modified_at {
+                    pn.signals.last_modified_at = mt;
                 }
+            }
+
+            // If the file is big enough to be its own treemap tile, promote
+            // it to a leaf node. Otherwise tally its bytes into the parent
+            // dir's "small files lump" so the dir's total still adds up.
+            if size >= FILE_NODE_MIN_BYTES {
+                let file_path_str = entry.path().to_string_lossy().to_string();
+                let file_name = entry
+                    .path()
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| file_path_str.clone());
+                let parent_depth = nodes[parent_id as usize].depth;
+                let id = nodes.len() as NodeId;
+                let signals = Signals {
+                    last_used_at: None,
+                    last_modified_at: file_mtime.unwrap_or_else(epoch),
+                    created_at: file_mtime.unwrap_or_else(epoch),
+                    is_backed_up_tm: false,
+                    is_in_icloud: false,
+                    is_known_junk: is_known_junk(entry.path().as_ref()),
+                    duplicate_group_id: None,
+                };
+                let leaf = DirNode {
+                    id,
+                    parent_id: Some(parent_id),
+                    path: file_path_str.clone(),
+                    name: file_name,
+                    depth: parent_depth + 1,
+                    size_bytes: size,
+                    file_count: 1,
+                    signals,
+                    children: Vec::new(),
+                    is_file: true,
+                };
+                path_to_id.insert(file_path_str, id);
+                nodes.push(leaf);
+                nodes[parent_id as usize].children.push(id);
+            } else {
+                // Small-file lump: add directly to parent's bytes so the
+                // rollup pass still accounts for it.
+                nodes[parent_id as usize].size_bytes += size;
             }
 
             files_seen += 1;
@@ -296,6 +347,7 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
             file_count: 0,
             signals,
             children: Vec::new(),
+            is_file: false,
         };
 
         path_to_id.insert(path_str, id);
