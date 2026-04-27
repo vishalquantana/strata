@@ -59,8 +59,9 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
         bytes_seen: 0,
     });
 
-    // Helper: emit a WalkProgress if both throttle gates are open.
-    // Returns true if an event was emitted (so caller can reset the node counter).
+    // Emits a WalkProgress event when both throttle gates open (≥ THROTTLE_MIN_NODES
+    // nodes processed AND ≥ THROTTLE_INTERVAL elapsed since last emit). Resets
+    // `nodes_since_last_emit` and `last_emit` internally on emit.
     macro_rules! maybe_emit {
         ($cb:expr) => {{
             if nodes_since_last_emit >= THROTTLE_MIN_NODES
