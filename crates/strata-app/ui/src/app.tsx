@@ -1,6 +1,6 @@
 import { createSignal, onMount, onCleanup, Show, createMemo } from "solid-js";
 import {
-  pickDirectory, startScan, onScanProgress, onScanComplete, onScanError,
+  pickDirectory, startScan, cancelScan, onScanProgress, onScanComplete, onScanError,
   startWatching, onFsChange, type FsChange,
 } from "./ipc";
 import { dismissCtxMenu, ctxMenuOpen } from "./viz/viz";
@@ -234,7 +234,16 @@ export default function App() {
                 phases={phases()}
                 elapsedMs={elapsedMs()}
                 snapshot={snapshot()}
-                onCancel={() => { setScanning(false); setEvent(null); }}
+                onCancel={() => {
+                  // Tell the backend to stop the walker first; without this,
+                  // the previous scan keeps running and its delayed
+                  // scan-complete clobbers any subsequent scan.
+                  void cancelScan();
+                  setScanning(false);
+                  setEvent(null);
+                  setSnapshot(null);
+                  setPhases(INITIAL_PHASES);
+                }}
               />
             </Show>
             <Show when={tree() && currentRoot() !== null}>

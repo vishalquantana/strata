@@ -23,6 +23,8 @@ use jwalk::WalkDir;
 use std::collections::HashMap;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 /// Knobs that disable expensive probes (used by tests and `--no-*` CLI flags).
 #[derive(Debug, Clone, Copy, Default)]
@@ -48,15 +50,21 @@ impl ScanOptions {
 }
 
 /// Run a full scan. `progress_cb` is invoked for each progress event.
+/// `cancel` is polled cooperatively; if it flips to true, the scan returns
+/// an `Err("cancelled")` as soon as practical.
 pub fn run(
     root: &Path,
     options: ScanOptions,
+    cancel: Arc<AtomicBool>,
     mut progress_cb: impl FnMut(&ProgressEvent),
 ) -> Result<ScanTree> {
     progress_cb(&ProgressEvent::WalkStarted {
         root: root.to_string_lossy().to_string(),
     });
-    let mut tree = walker::walk(root, &mut progress_cb)?;
+    let mut tree = walker::walk(root, &mut progress_cb, cancel.clone())?;
+    if cancel.load(Ordering::Relaxed) {
+        anyhow::bail!("cancelled");
+    }
     progress_cb(&ProgressEvent::WalkCompleted {
         node_count: tree.nodes.len(),
     });
@@ -65,6 +73,9 @@ pub fn run(
 
     // --- TM probe ---
     let mut tm_status: HashMap<String, bool> = HashMap::new();
+    if cancel.load(Ordering::Relaxed) {
+        anyhow::bail!("cancelled");
+    }
     if !options.disable_tm {
         progress_cb(&ProgressEvent::ProbeStarted { kind: "tm".into() });
         let checker = TmChecker::real();
@@ -82,6 +93,9 @@ pub fn run(
 
     // --- iCloud probe ---
     let mut icloud_status: HashMap<String, bool> = HashMap::new();
+    if cancel.load(Ordering::Relaxed) {
+        anyhow::bail!("cancelled");
+    }
     if !options.disable_icloud && icloud_drive_enabled(&home) {
         progress_cb(&ProgressEvent::ProbeStarted {
             kind: "icloud".into(),
@@ -101,6 +115,9 @@ pub fn run(
 
     // --- Spotlight probe ---
     let mut last_used: HashMap<String, chrono::DateTime<chrono::Utc>> = HashMap::new();
+    if cancel.load(Ordering::Relaxed) {
+        anyhow::bail!("cancelled");
+    }
     if !options.disable_spotlight {
         progress_cb(&ProgressEvent::ProbeStarted {
             kind: "spotlight".into(),
@@ -123,6 +140,9 @@ pub fn run(
 
     // --- Hashing probe ---
     let mut dupe_groups: HashMap<String, u64> = HashMap::new();
+    if cancel.load(Ordering::Relaxed) {
+        anyhow::bail!("cancelled");
+    }
     if !options.disable_hash {
         progress_cb(&ProgressEvent::ProbeStarted {
             kind: "hash".into(),

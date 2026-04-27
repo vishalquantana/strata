@@ -32,6 +32,10 @@ export async function startScan(path: string): Promise<void> {
   await invoke("start_scan", { path });
 }
 
+export async function cancelScan(): Promise<void> {
+  await invoke("cancel_scan");
+}
+
 export function onScanProgress(cb: (ev: ProgressEvent) => void): Promise<UnlistenFn> {
   return listen<ProgressEvent>("scan-progress", (e) => cb(e.payload));
 }

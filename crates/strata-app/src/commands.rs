@@ -36,6 +36,13 @@ pub fn start_scan(app: AppHandle, path: String) {
     scan_runner::start_scan(app, PathBuf::from(path));
 }
 
+/// Cancel the currently-running scan, if any. The scan thread polls a
+/// shared atomic flag and bails out at the next entry boundary.
+#[tauri::command]
+pub fn cancel_scan() {
+    scan_runner::cancel_current_scan();
+}
+
 #[tauri::command]
 pub fn reveal_in_finder(path: String) -> Result<(), String> {
     let p = Path::new(&path);

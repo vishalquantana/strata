@@ -18,6 +18,8 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Minimum wall-clock interval between `WalkProgress` emissions.
@@ -55,7 +57,11 @@ const FILE_NODE_MIN_BYTES: u64 = 64 * 1024;
 /// once per 250 ms (and at least 1 000 nodes between emissions).  A final
 /// flush is emitted immediately before the function returns so the UI always
 /// shows consistent totals.
-pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result<ScanTree> {
+pub fn walk(
+    root: &Path,
+    progress_cb: &mut impl FnMut(&ProgressEvent),
+    cancel: Arc<AtomicBool>,
+) -> Result<ScanTree> {
     let scanned_at = Utc::now();
     let canonical = root
         .canonicalize()
@@ -161,6 +167,11 @@ pub fn walk(root: &Path, progress_cb: &mut impl FnMut(&ProgressEvent)) -> Result
         })
         .into_iter()
     {
+        // Cooperative cancellation: bail out as soon as the controller flips
+        // the flag. Checked once per entry — cheap relaxed atomic load.
+        if cancel.load(Ordering::Relaxed) {
+            anyhow::bail!("cancelled");
+        }
         let entry = match entry {
             Ok(e) => e,
             Err(_) => continue, // permission denied etc — skip silently

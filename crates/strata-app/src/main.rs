@@ -42,6 +42,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::pick_directory,
             commands::start_scan,
+            commands::cancel_scan,
             commands::list_volumes,
             commands::reveal_in_finder,
             commands::move_to_trash,

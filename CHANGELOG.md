@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.9] - 2026-04-27
+## [0.3.10] - 2026-04-27
+
+### Fixed
+- **Scan cancellation actually cancels.** Previously, clicking Cancel only
+  flipped frontend state — the background walker thread kept running, and a
+  subsequent scan would race with the original scan's delayed
+  `scan-complete`, which clobbered the new view (e.g. starting a `/` scan,
+  cancelling, then clicking Downloads would briefly show Downloads then
+  jump back to `/`). The walker now polls a shared
+  `Arc<AtomicBool>` once per directory entry and bails out promptly. The
+  scan runner tracks the active scan and drops emits from cancelled scans,
+  and starting a new scan cancels any previous in-flight scan automatically.
+
+### Added
+- `cancel_scan` Tauri command (no-op when no scan is running).
+
+
 
 ### Added
 - **Cloud-storage detection per file.** The walker now tags every file with

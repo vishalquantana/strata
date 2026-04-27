@@ -1,4 +1,6 @@
 use std::fs;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use strata_scan::{run, ScanOptions};
 use tempfile::tempdir;
 
@@ -17,7 +19,8 @@ fn small_fixture_tree() {
     opts.disable_icloud = true;
     opts.disable_hash = true;
 
-    let tree = run(dir.path(), opts, |_| {}).unwrap();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let tree = run(dir.path(), opts, cancel, |_| {}).unwrap();
 
     // Assert structural facts (timestamps and tempdir paths are not stable).
     let root = &tree.nodes[tree.root_id as usize];

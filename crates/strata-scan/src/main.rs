@@ -1,6 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use strata_scan::output::{render_progress_jsonl, render_tree_json};
 use strata_scan::{run, ScanOptions};
 
@@ -40,7 +42,8 @@ fn main() -> Result<()> {
         hash_min_bytes: cli.hash_min_bytes,
     };
 
-    let tree = run(&cli.path, opts, |ev| {
+    let cancel = Arc::new(AtomicBool::new(false));
+    let tree = run(&cli.path, opts, cancel, |ev| {
         if let Ok(line) = render_progress_jsonl(ev) {
             print!("{line}");
         }
