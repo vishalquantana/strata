@@ -11,6 +11,22 @@ export default function FiltersSection() {
   const store = filterStore();
   return (
     <div style={section}>
+      <div style={label}>View</div>
+      <div
+        onClick={() => store.toggleCloud()}
+        style={{
+          ...row,
+          ...(store.hideCloud() ? rowOn : {}),
+        }}
+      >
+        <span style={{ display: "flex", "align-items": "center", gap: "8px" }}>
+          <span style={{ ...dot, background: "#60a5fa", opacity: store.hideCloud() ? "1" : "0.4" }} />
+          Hide cloud files
+        </span>
+        <span style={{ color: "#4b5563", "font-size": "11px" }}>
+          {store.hideCloud() ? "✓" : ""}
+        </span>
+      </div>
       <div style={label}>Filters</div>
       {FILTERS.map((f) => {
         const isOn = () => store.active().has(f.key);

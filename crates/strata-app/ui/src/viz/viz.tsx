@@ -4,12 +4,13 @@ import { setupCanvas, clear } from "./canvas";
 import { buildHierarchy } from "./hierarchy";
 import { computeTreemap, type Rect } from "./layout-treemap";
 import { computeSunburst, type Arc } from "./layout-sunburst";
+import { computeGrid } from "./layout-grid";
 import { render, type Shape } from "./render";
 import { hitTestRects, hitTestArcs } from "./hit-test";
 import { buildMorphShapes, easeInOutCubic } from "./morph";
 import Toggle, { type VizMode } from "../components/toggle";
 import HoverPeek from "../components/hover-peek";
-import { makeMatcher } from "../stores/filters";
+import { makeMatcher, filterStore } from "../stores/filters";
 import { selectionStore } from "../stores/selection";
 import { revealInFinder, moveToTrash } from "../ipc";
 
@@ -35,8 +36,11 @@ export default function Viz(props: Props) {
   const matcher = makeMatcher();
   const sel = selectionStore();
 
+  const filters = filterStore();
+
   let rects: Rect[] = [];
   let arcs: Arc[] = [];
+  let gridRects: Rect[] = [];
   let nodesById = new Map<number, DirNode>();
   let ctx: CanvasRenderingContext2D | null = null;
   let cssWidth = 0;
@@ -52,18 +56,19 @@ export default function Viz(props: Props) {
     cssWidth = r.width;
     cssHeight = r.height;
     nodesById = new Map(props.tree.nodes.map((n) => [n.id, n]));
-    const h = buildHierarchy(props.tree, zoomRoot());
-    // Use a tiny threshold so every-file leaves down to ~1px² still render —
-    // gives the GrandPerspective-style "see everything at once" view. Render
-    // pass already drops sub-pixel rects, so this is just a layout filter.
+    const h = buildHierarchy(props.tree, zoomRoot(), { hideCloud: filters.hideCloud() });
     rects = computeTreemap(h, cssWidth, cssHeight, 0);
     arcs = computeSunburst(h, cssWidth, cssHeight);
+    gridRects = computeGrid(h, cssWidth, cssHeight);
     drawCurrent();
   }
 
   function shapesForMode(m: VizMode): Shape[] {
     if (m === "treemap") {
       return rects.map((r) => ({ kind: "rect" as const, rect: r, id: r.id }));
+    }
+    if (m === "grid") {
+      return gridRects.map((r) => ({ kind: "rect" as const, rect: r, id: r.id }));
     }
     return arcs.map((a) => ({ kind: "arc" as const, arc: a, id: a.id }));
   }
@@ -82,7 +87,15 @@ export default function Viz(props: Props) {
 
   function startMorph(to: VizMode) {
     if (mode() === to) return;
-    morphFrom = mode();
+    const from = mode();
+    // Morph animation only works between treemap <-> sunburst.
+    // Grid switches instantly.
+    if (from === "grid" || to === "grid") {
+      setMode(to);
+      drawCurrent();
+      return;
+    }
+    morphFrom = from;
     morphStart = performance.now();
     if (rafId !== null) cancelAnimationFrame(rafId);
     const tick = (now: number) => {
@@ -155,6 +168,7 @@ export default function Viz(props: Props) {
   });
   createEffect(() => {
     zoomRoot();
+    filters.hideCloud();
     relayout();
   });
   createEffect(() => {
@@ -171,7 +185,10 @@ export default function Viz(props: Props) {
     const r = canvasRef.getBoundingClientRect();
     const x = e.clientX - r.left;
     const y = e.clientY - r.top;
-    const id = mode() === "treemap" ? hitTestRects(rects, x, y) : hitTestArcs(arcs, x, y);
+    const m = mode();
+    const id = m === "treemap" ? hitTestRects(rects, x, y)
+      : m === "grid" ? hitTestRects(gridRects, x, y)
+      : hitTestArcs(arcs, x, y);
     setHoveredId(id);
     setCursor({ x: e.clientX, y: e.clientY });
   }

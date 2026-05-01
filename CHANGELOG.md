@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.11] - 2026-05-01
+
+### Added
+- **Hide cloud files by default.** Cloud-synced files (iCloud, Google Drive,
+  OneDrive, Dropbox, Box) are now excluded from the treemap by default. Toggle
+  via the new "Hide cloud files" switch in the sidebar.
+- **Grid view.** New equal-sized grid layout shows all folders at the same size,
+  making small folders visible alongside large ones. Switchable via the view
+  toggle alongside Treemap and Sunburst.
+- **Nested treemap.** Directory containers now render with dark backgrounds,
+  borders, and label bars — showing folder hierarchy visually like
+  GrandPerspective/WinDirStat.
+
 ## [0.3.10] - 2026-04-27
 
 ### Fixed

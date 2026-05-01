@@ -1,4 +1,4 @@
-export type VizMode = "treemap" | "sunburst";
+export type VizMode = "treemap" | "sunburst" | "grid";
 
 interface Props {
   mode: VizMode;
@@ -16,6 +16,10 @@ export default function Toggle(props: Props) {
         style={{ ...pill, ...(props.mode === "treemap" ? on : off) }}
         onClick={() => props.onChange("treemap")}
       >&#9638; Treemap</button>
+      <button
+        style={{ ...pill, ...(props.mode === "grid" ? on : off) }}
+        onClick={() => props.onChange("grid")}
+      >&#9783; Grid</button>
     </div>
   );
 }

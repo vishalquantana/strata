@@ -4,16 +4,19 @@ import type { DirNode } from "../types";
 export type FilterKey = "stale" | "junk" | "dupes" | "tm_safe";
 
 const [active, setActive] = createSignal<Set<FilterKey>>(new Set());
+const [hideCloud, setHideCloud] = createSignal<boolean>(true);
 
 export function filterStore() {
   return {
     active,
+    hideCloud,
     toggle(key: FilterKey) {
       const cur = new Set<FilterKey>(active());
       if (cur.has(key)) cur.delete(key);
       else cur.add(key);
       setActive(cur);
     },
+    toggleCloud() { setHideCloud(!hideCloud()); },
     clear() { setActive(new Set<FilterKey>()); },
   };
 }

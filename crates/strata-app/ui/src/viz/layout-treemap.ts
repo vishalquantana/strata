@@ -19,7 +19,9 @@ export function computeTreemap(
   const layout = treemap<DirNode>()
     .tile(treemapSquarify.ratio(1.4))
     .size([width, height])
-    .padding(1)
+    .paddingTop(16)
+    .paddingInner(3)
+    .paddingOuter(2)
     .round(true);
   layout(root);
 

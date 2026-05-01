@@ -26,12 +26,15 @@ export function render(ctx: CanvasRenderingContext2D, input: RenderInput) {
     const node = input.nodesById.get(s.id)!;
     const matched = input.isMatched(node);
     ctx.globalAlpha = matched ? 1 : 0.2;
+    const isDir = node.children.length > 0;
     const fill = colorForNode(node);
     if (s.kind === "rect" && s.rect) {
-      // Skip sub-pixel tiles — with every-file leaves we get many nodes that
-      // would render as invisible slivers and just waste fillRect calls.
       if (s.rect.w < 1 || s.rect.h < 1) continue;
-      drawRect(ctx, s.rect, fill, node, input.hoveredId === s.id || input.selectedId === s.id);
+      if (isDir) {
+        drawDirRect(ctx, s.rect, node, input.hoveredId === s.id || input.selectedId === s.id);
+      } else {
+        drawRect(ctx, s.rect, fill, node, input.hoveredId === s.id || input.selectedId === s.id);
+      }
     } else if (s.kind === "arc" && s.arc) {
       drawArc(ctx, s.arc, fill, input.hoveredId === s.id || input.selectedId === s.id);
     } else if (s.kind === "morph" && s.rectFrom && s.arcTo && s.morphT !== undefined) {
@@ -43,6 +46,35 @@ export function render(ctx: CanvasRenderingContext2D, input: RenderInput) {
     }
   }
   ctx.globalAlpha = 1;
+}
+
+function drawDirRect(
+  ctx: CanvasRenderingContext2D,
+  r: Rect,
+  node: DirNode,
+  hovered: boolean,
+) {
+  // Dark container background
+  ctx.fillStyle = "#141418";
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  // Subtle border
+  ctx.strokeStyle = "#2a2a35";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+  // Label bar at top
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.fillRect(r.x, r.y, r.w, 14);
+  if (r.w > 30) {
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.font = "600 9px -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif";
+    ctx.textBaseline = "top";
+    ctx.fillText(truncate(node.name, Math.floor(r.w / 6)), r.x + 4, r.y + 3);
+  }
+  if (hovered) {
+    ctx.strokeStyle = "rgba(255,255,255,0.4)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+  }
 }
 
 function drawRect(
